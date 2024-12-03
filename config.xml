@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <serverIp>127.0.0.1</serverIp>
+    <serverPort>12345</serverPort>
+    <dbUrl>jdbc:mysql://localhost:3306/chat</dbUrl>
+    <dbUsername>root</dbUsername>
+    <dbPassword>lool</dbPassword>
+</config>
