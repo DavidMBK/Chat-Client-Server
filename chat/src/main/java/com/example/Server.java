@@ -1,11 +1,24 @@
 package com.example;
 
-import java.io.*;
-import java.net.*;
-import java.sql.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import com.example.config.Config;
 
@@ -107,14 +120,19 @@ public class Server implements Runnable {
             this.scheduler = new ScheduledThreadPoolExecutor(1);
 
             // Task per disconnettere l'utente inattivo
+            // Task per disconnettere l'utente inattivo
             this.timeoutTask = () -> {
                 try {
+                    if (clientInfo.isAuthenticated()) {
+                        out.println("Sessione scaduta. Riaccedere.");
+                    }
                     System.out.println("User " + clientInfo.getNickname() + " inactive for " + inactivityTimeout + " seconds. Disconnecting...");
                     shutdown(); // Disconnette solo questo client
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             };
+
         }
 
         public void run() {
@@ -194,8 +212,7 @@ public class Server implements Runnable {
         // Registra un nuovo utente nel database
         private boolean registerUser(String nickname, String password) {
             String sql = "INSERT INTO Account (Nickname, Password) VALUES (?, ?)";
-            try (Connection conn = Database.getInstance().getConnection();
-                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 stmt.setString(2, password);
                 stmt.executeUpdate();
@@ -209,8 +226,7 @@ public class Server implements Runnable {
         // Valida il login
         private boolean validateLogin(String nickname, String password) {
             String sql = "SELECT Password FROM Account WHERE Nickname = ?";
-            try (Connection conn = Database.getInstance().getConnection();
-                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
@@ -231,16 +247,19 @@ public class Server implements Runnable {
         public void shutdown() {
             try {
                 if (!client.isClosed()) {
-                    client.close();
+                    if (clientInfo.isAuthenticated()) {
+                        out.println("Sessione scaduta. Riaccedere.");
+                    }
+                    client.close();  // Chiudi la connessione del client
                 }
                 connections.remove(this); // Rimuovi dalla lista globale
                 scheduler.shutdown();
-                updateUsersList(); // Aggiorna la lista utenti
+                updateUsersList(); // Aggiorna la lista degli utenti connessi
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-
+        
         public boolean isAuthenticated() {
             return clientInfo.isAuthenticated();
         }

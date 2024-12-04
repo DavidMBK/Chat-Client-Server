@@ -83,10 +83,20 @@ public class Client implements Runnable {
             loginFrame.showError(errorMessage);
         } else if (message.startsWith("/users_list")) {
             processUsersList(message); // Processa la lista degli utenti
+        } else if (message.equals("Sessione scaduta. Riaccedere.")) {
+            // Gestione sessione scaduta
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    gui.setVisible(false); // Nasconde la finestra di chat
+                    loginFrame.setVisible(true); // Mostra la finestra di login
+                    showError("Sessione scaduta. Riaccedere.");
+                }
+            });
         } else {
             gui.appendMessage(message); // Aggiunge qualsiasi altro messaggio alla chat
         }
     }
+    
 
     // Metodo per processare la lista degli utenti
     private void processUsersList(String message) {
@@ -99,17 +109,28 @@ public class Client implements Runnable {
     public void shutdown() {
         done = true;
         try {
-            if (in != null)
+            if (in != null) {
                 in.close(); // Chiusura risorse lettura
-            if (out != null)
-                out.close(); // Chiusura risorse Scrittura
+            }
+            if (out != null) {
+                out.close(); // Chiusura risorse scrittura
+            }
             if (client != null && !client.isClosed()) {
                 client.close(); // Chiude il client
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            // Mostra la finestra di login in caso di disconnessione
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    gui.setVisible(false); // Nasconde la finestra principale
+                    loginFrame.setVisible(true); // Mostra la finestra di login
+                }
+            });
         }
     }
+    
 
     // Metodo per inviare un messaggio al server
     public void sendMessage(String messageText) {
