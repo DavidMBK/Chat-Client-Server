@@ -146,8 +146,6 @@ public class Server implements Runnable {
                 clientInfo.setNickname(nickname);
                 out.println("/login_success");
                 updateUsersList();
-            } else {
-                out.println("Nickname o password non validi.");
             }
         }
 
@@ -163,8 +161,6 @@ public class Server implements Runnable {
 
             if (registerUser(nickname, password)) {
                 out.println("/register_success");
-            } else {
-                out.println("Il nickname esiste già. Scegli un altro nickname.");
             }
         }
 
