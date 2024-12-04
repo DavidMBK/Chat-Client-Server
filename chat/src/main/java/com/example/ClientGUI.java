@@ -15,9 +15,17 @@ public class ClientGUI extends JFrame {
     public ClientGUI(final Client client) {
         this.client = client;
         setTitle("Zuusmee - Telegram Style");
-        setSize(600, 500);
+        setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+
+        // Titolo grande dell'app
+        JLabel titleLabel = new JLabel("Zuusmee", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        titleLabel.setOpaque(true);
+        titleLabel.setBackground(new Color(0, 132, 255));
+        titleLabel.setForeground(Color.WHITE);
 
         chat = new JTextArea();
         chat.setEditable(false);
@@ -66,13 +74,22 @@ public class ClientGUI extends JFrame {
         userList.setForeground(Color.BLACK);
         userList.setSelectionBackground(new Color(0, 132, 255));
         userList.setSelectionForeground(Color.WHITE);
-        JScrollPane userScrollPane = new JScrollPane(userList);
-        userScrollPane.setPreferredSize(new Dimension(150, 0));
+
+        // Pannello per gli utenti
+        JPanel userListPanel = new JPanel(new BorderLayout());
+        JLabel userListLabel = new JLabel("Utenti");
+        userListLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        userListLabel.setHorizontalAlignment(JLabel.CENTER);
+        userListLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        userListPanel.add(userListLabel, BorderLayout.NORTH);
+        userListPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
+        userListPanel.setPreferredSize(new Dimension(200, 0));
 
         getContentPane().setLayout(new BorderLayout());
+        getContentPane().add(titleLabel, BorderLayout.NORTH); // Aggiunge il titolo grande in alto
         getContentPane().add(chatScrollPane, BorderLayout.CENTER);
         getContentPane().add(bottom, BorderLayout.SOUTH);
-        getContentPane().add(userScrollPane, BorderLayout.EAST);
+        getContentPane().add(userListPanel, BorderLayout.EAST); // Aggiunge il pannello degli utenti a destra
 
         this.addWindowListener(new WindowAdapter() {
             @Override
