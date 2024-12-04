@@ -7,7 +7,8 @@ import java.awt.event.*;
 public class ClientGUI extends JFrame {
 
     private JTextField input;
-    private JTextArea chat;
+    private JPanel chatPanel;
+    private JScrollPane chatScrollPane;
     private JList<String> userList;
     private DefaultListModel<String> userListModel;
     private Client client;
@@ -27,14 +28,12 @@ public class ClientGUI extends JFrame {
         titleLabel.setBackground(new Color(0, 132, 255));
         titleLabel.setForeground(Color.WHITE);
 
-        chat = new JTextArea();
-        chat.setEditable(false);
-        chat.setFont(new Font("Arial", Font.PLAIN, 14));
-        chat.setBackground(new Color(245, 245, 245));
-        chat.setForeground(Color.BLACK);
-        chat.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding interno
-        JScrollPane chatScrollPane = new JScrollPane(chat);
-        chatScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Margini esterni
+        chatPanel = new JPanel();
+        chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
+        chatPanel.setBackground(new Color(245, 245, 245));
+
+        chatScrollPane = new JScrollPane(chatPanel);
+        chatScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         input = new JTextField();
         input.setFont(new Font("Arial", Font.PLAIN, 14));
@@ -65,7 +64,7 @@ public class ClientGUI extends JFrame {
         });
 
         JPanel bottom = new JPanel(new BorderLayout());
-        bottom.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Margini esterni
+        bottom.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         bottom.add(input, BorderLayout.CENTER);
         bottom.add(send, BorderLayout.EAST);
 
@@ -77,9 +76,8 @@ public class ClientGUI extends JFrame {
         userList.setSelectionBackground(new Color(0, 132, 255));
         userList.setSelectionForeground(Color.WHITE);
 
-        // Pannello per gli utenti
         JPanel userListPanel = new JPanel(new BorderLayout());
-        userListPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Margini esterni
+        userListPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         JLabel userListLabel = new JLabel("Utenti");
         userListLabel.setFont(new Font("Arial", Font.BOLD, 14));
         userListLabel.setHorizontalAlignment(JLabel.CENTER);
@@ -89,10 +87,10 @@ public class ClientGUI extends JFrame {
         userListPanel.setPreferredSize(new Dimension(200, 0));
 
         getContentPane().setLayout(new BorderLayout());
-        getContentPane().add(titleLabel, BorderLayout.NORTH); // Aggiunge il titolo grande in alto
+        getContentPane().add(titleLabel, BorderLayout.NORTH);
         getContentPane().add(chatScrollPane, BorderLayout.CENTER);
         getContentPane().add(bottom, BorderLayout.SOUTH);
-        getContentPane().add(userListPanel, BorderLayout.EAST); // Aggiunge il pannello degli utenti a destra
+        getContentPane().add(userListPanel, BorderLayout.EAST);
 
         this.addWindowListener(new WindowAdapter() {
             @Override
@@ -106,13 +104,17 @@ public class ClientGUI extends JFrame {
     private void sendMessage() {
         String message = input.getText().trim();
         if (!message.isEmpty()) {
+            appendMessage(message, true);
             client.sendMessage(message);
             input.setText("");
         }
     }
 
-    public void appendMessage(String message) {
-        chat.append(message + "\n");
+    public void appendMessage(String message, boolean sentByUser) {
+        MessageBubble bubble = new MessageBubble(message, sentByUser);
+        chatPanel.add(bubble);
+        chatPanel.revalidate();
+        chatScrollPane.getVerticalScrollBar().setValue(chatScrollPane.getVerticalScrollBar().getMaximum());
     }
 
     public void updateUsersList(final String[] users) {
@@ -128,7 +130,9 @@ public class ClientGUI extends JFrame {
     }
 
     public void removeInstructions() {
-        chat.setText("");
+        chatPanel.removeAll();
+        chatPanel.revalidate();
+        chatPanel.repaint();
     }
 
     public static void main(String[] args) {

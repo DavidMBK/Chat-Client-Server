@@ -64,7 +64,7 @@ public class Client implements Runnable {
         }
     }
 
-// Metodo per processare i messaggi ricevuti dal server
+    // Metodo per processare i messaggi ricevuti dal server
     private void processMessage(String message) {
         if (message.startsWith("/login_success")) {
             isAuthenticated = true;
@@ -72,7 +72,7 @@ public class Client implements Runnable {
                 public void run() {
                     loginFrame.setVisible(false); // Nasconde la finestra di login
                     gui.setVisible(true); // Mostra la finestra principale del client
-                    gui.appendMessage("Benvenuto su Zuusmee, " + getNickname() + "!");
+                    gui.appendMessage("Benvenuto su Zuusmee, " + getNickname() + "!", false);
                 }
             });
         } else if (message.startsWith("/register_success")) {
@@ -104,10 +104,9 @@ public class Client implements Runnable {
             // Riconnessione: resetta e avvia di nuovo il ciclo
             resetConnection();
         } else {
-            gui.appendMessage(message); // Aggiunge qualsiasi altro messaggio alla chat
+            gui.appendMessage(message, false); // Aggiunge qualsiasi altro messaggio alla chat
         }
     }
-
 
     // Metodo per processare la lista degli utenti
     private void processUsersList(String message) {
