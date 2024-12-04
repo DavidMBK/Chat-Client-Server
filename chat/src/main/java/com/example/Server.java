@@ -187,7 +187,7 @@ public class Server implements Runnable {
                 out.println("/login_success");
                 updateUsersList();
             } else {
-                out.println("Login failed.");
+                out.println("/error Nome utente o password errati.");
             }
         }
 

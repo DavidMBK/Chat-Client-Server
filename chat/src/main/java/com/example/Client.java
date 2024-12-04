@@ -64,7 +64,7 @@ public class Client implements Runnable {
         }
     }
 
-    // Metodo per processare i messaggi ricevuti dal server
+// Metodo per processare i messaggi ricevuti dal server
     private void processMessage(String message) {
         if (message.startsWith("/login_success")) {
             isAuthenticated = true;
@@ -107,6 +107,7 @@ public class Client implements Runnable {
             gui.appendMessage(message); // Aggiunge qualsiasi altro messaggio alla chat
         }
     }
+
 
     // Metodo per processare la lista degli utenti
     private void processUsersList(String message) {
@@ -181,8 +182,9 @@ public class Client implements Runnable {
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1)
+                if (hex.length() == 1) {
                     hexString.append('0');
+                }
                 hexString.append(hex);
             }
             return hexString.toString();
