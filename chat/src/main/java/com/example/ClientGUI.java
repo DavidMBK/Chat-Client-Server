@@ -32,7 +32,9 @@ public class ClientGUI extends JFrame {
         chat.setFont(new Font("Arial", Font.PLAIN, 14));
         chat.setBackground(new Color(245, 245, 245));
         chat.setForeground(Color.BLACK);
+        chat.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding interno
         JScrollPane chatScrollPane = new JScrollPane(chat);
+        chatScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Margini esterni
 
         input = new JTextField();
         input.setFont(new Font("Arial", Font.PLAIN, 14));
@@ -63,9 +65,9 @@ public class ClientGUI extends JFrame {
         });
 
         JPanel bottom = new JPanel(new BorderLayout());
+        bottom.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Margini esterni
         bottom.add(input, BorderLayout.CENTER);
         bottom.add(send, BorderLayout.EAST);
-        bottom.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
         userListModel = new DefaultListModel<>();
         userList = new JList<>(userListModel);
@@ -77,6 +79,7 @@ public class ClientGUI extends JFrame {
 
         // Pannello per gli utenti
         JPanel userListPanel = new JPanel(new BorderLayout());
+        userListPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Margini esterni
         JLabel userListLabel = new JLabel("Utenti");
         userListLabel.setFont(new Font("Arial", Font.BOLD, 14));
         userListLabel.setHorizontalAlignment(JLabel.CENTER);
