@@ -85,7 +85,7 @@ public class Client implements Runnable {
         } else if (message.startsWith("/error")) {
             // Gestisce i messaggi di errore per login o registrazione
             String errorMessage = message.replace("/error ", "");
-            loginFrame.showError(errorMessage);
+            showError(errorMessage);
         } else if (message.startsWith("/users_list")) {
             processUsersList(message); // Processa la lista degli utenti
         } else if (message.equals("Sessione scaduta. Riaccedere.")) {
@@ -150,7 +150,7 @@ public class Client implements Runnable {
 
     // Metodo per mostrare un messaggio di errore tramite gui
     private void showError(String message) {
-        JOptionPane.showMessageDialog(gui, message, "Error", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(gui, message, "Errore", JOptionPane.ERROR_MESSAGE);
     }
 
     // Getter per l'autenticazione

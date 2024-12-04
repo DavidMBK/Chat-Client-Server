@@ -120,7 +120,6 @@ public class Server implements Runnable {
             this.scheduler = new ScheduledThreadPoolExecutor(1);
 
             // Task per disconnettere l'utente inattivo
-            // Task per disconnettere l'utente inattivo
             this.timeoutTask = () -> {
                 try {
                     if (clientInfo.isAuthenticated()) {
@@ -211,14 +210,33 @@ public class Server implements Runnable {
 
         // Registra un nuovo utente nel database
         private boolean registerUser(String nickname, String password) {
+            // Prima controlliamo se il nickname esiste già nel database
+            String checkSql = "SELECT COUNT(*) FROM Account WHERE Nickname = ?";
+            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                checkStmt.setString(1, nickname);
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next() && rs.getInt(1) > 0) {
+                    // Se il nickname esiste già, invia un errore al client
+                    out.println("/error Nickname già in uso. Scegli un altro nome.");
+                    return false;
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                out.println("/error Errore durante la registrazione.");
+                return false;
+            }
+
+            // Se il nickname è disponibile, procediamo con la registrazione
             String sql = "INSERT INTO Account (Nickname, Password) VALUES (?, ?)";
             try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 stmt.setString(2, password);
                 stmt.executeUpdate();
+                out.println("/register_success");
                 return true;
             } catch (SQLException e) {
                 e.printStackTrace();
+                out.println("/error Errore durante la registrazione.");
                 return false;
             }
         }
@@ -259,7 +277,7 @@ public class Server implements Runnable {
                 e.printStackTrace();
             }
         }
-        
+
         public boolean isAuthenticated() {
             return clientInfo.isAuthenticated();
         }
