@@ -61,12 +61,6 @@ public class ClientGUI extends JFrame {
         getContentPane().add(bottom, BorderLayout.SOUTH); // Aggiunge il pannello inferiore in basso
         getContentPane().add(userScrollPane, BorderLayout.EAST); // Aggiunge la lista degli utenti a destra
 
-        // Aggiungi le istruzioni iniziali nella chat solo se l'utente non è autenticato
-        if (!client.isAuthenticated()) {
-            chat.append(
-                    "Per loggarti:\n/login <nickname> <password>\n\nPer registrarti:\n/register <nickname> <password>\n");
-        }
-
         // Chiude le finestre
         this.addWindowListener(new WindowAdapter() {
             @Override
