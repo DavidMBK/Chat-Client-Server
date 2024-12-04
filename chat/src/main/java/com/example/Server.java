@@ -47,7 +47,7 @@ public class Server implements Runnable {
                 Socket client = server.accept(); // Accetta nuove connessioni
 
                 Client clientInfo = new Client();
-                int inactivityTimeout = 60; // Timeout configurabile
+                int inactivityTimeout = 15; // Timeout configurabile
 
                 // Crea un gestore per il client
                 ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);

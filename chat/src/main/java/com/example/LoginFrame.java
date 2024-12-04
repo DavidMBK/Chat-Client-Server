@@ -106,4 +106,8 @@ public class LoginFrame extends JFrame {
     public void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
+
+    public void clearPasswordField() {
+        passwordField.setText(""); // Svuota il campo della password
+    }
 }

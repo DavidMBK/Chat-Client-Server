@@ -29,6 +29,11 @@ public class Client implements Runnable {
     }
 
     public void run() {
+        connectToServer();
+    }
+
+    // Metodo per connettersi al server
+    private void connectToServer() {
         try {
             // Carica la configurazione dal file di configurazione
             Config config = Config.getInstance();
@@ -90,13 +95,18 @@ public class Client implements Runnable {
                     gui.setVisible(false); // Nasconde la finestra di chat
                     loginFrame.setVisible(true); // Mostra la finestra di login
                     showError("Sessione scaduta. Riaccedere.");
+
+                    // Svuota il campo della password
+                    loginFrame.clearPasswordField();
                 }
             });
+
+            // Riconnessione: resetta e avvia di nuovo il ciclo
+            resetConnection();
         } else {
             gui.appendMessage(message); // Aggiunge qualsiasi altro messaggio alla chat
         }
     }
-    
 
     // Metodo per processare la lista degli utenti
     private void processUsersList(String message) {
@@ -130,7 +140,6 @@ public class Client implements Runnable {
             });
         }
     }
-    
 
     // Metodo per inviare un messaggio al server
     public void sendMessage(String messageText) {
@@ -182,22 +191,11 @@ public class Client implements Runnable {
         }
     }
 
-    // Classe interna per gestire l'input da tastiera
-    class InputHandler implements Runnable {
-        public void run() {
-            try {
-                BufferedReader inReader = new BufferedReader(new InputStreamReader(System.in));
-                while (!done) {
-                    String messageText = inReader.readLine();
-                    if (!messageText.trim().isEmpty()) {
-                        sendMessage(messageText); // Se legge e il messaggio non è vuoto, lo invia.
-                    }
-                }
-            } catch (IOException e) {
-                showError("Error reading input.");
-                shutdown();
-            }
-        }
+    // Metodo per resettare la connessione (riavvia il processo da capo)
+    private void resetConnection() {
+        shutdown();  // Chiude la connessione corrente
+        isAuthenticated = false;  // Reset dell'autenticazione
+        run();  // Riconnette e riavvia tutto
     }
 
     public static void main(String[] args) {
