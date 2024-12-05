@@ -1,14 +1,21 @@
 package com.example;
 
-import javax.swing.*;
-import com.example.config.Config;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.Socket;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+
+import com.example.config.Config;
 
 public class Client implements Runnable {
 
@@ -95,7 +102,6 @@ public class Client implements Runnable {
                     gui.setVisible(false); // Nasconde la finestra di chat
                     loginFrame.setVisible(true); // Mostra la finestra di login
                     showError("Sessione scaduta. Riaccedere.");
-
                     // Svuota il campo della password
                     loginFrame.clearPasswordField();
                 }
@@ -131,10 +137,10 @@ public class Client implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            // Mostra la finestra di login in caso di disconnessione
+            // Qui non nascondiamo immediatamente la finestra di login
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
-                    gui.setVisible(false); // Nasconde la finestra principale
+                    // Solo quando l'utente clicca l'errore, la finestra di login sparisce
                     loginFrame.setVisible(true); // Mostra la finestra di login
                 }
             });
@@ -194,9 +200,9 @@ public class Client implements Runnable {
 
     // Metodo per resettare la connessione (riavvia il processo da capo)
     private void resetConnection() {
-        shutdown();  // Chiude la connessione corrente
-        isAuthenticated = false;  // Reset dell'autenticazione
-        run();  // Riconnette e riavvia tutto
+        shutdown(); // Chiude la connessione corrente
+        isAuthenticated = false; // Reset dell'autenticazione
+        run(); // Riconnette e riavvia tutto
     }
 
     public static void main(String[] args) {

@@ -107,6 +107,7 @@ public class Server implements Runnable {
         private ScheduledFuture<?> timeoutFuture;
         private final Runnable timeoutTask;
         private final int inactivityTimeout;
+        private boolean sessionExpired; // Flag che indica se la sessione è scaduta
 
         public ConnectionHandler(Socket client, Client clientInfo, int inactivityTimeout) throws IOException {
             this.client = client;
@@ -115,14 +116,16 @@ public class Server implements Runnable {
             this.scheduler = new ScheduledThreadPoolExecutor(1);
             this.in = new BufferedReader(new InputStreamReader(client.getInputStream()));
             this.out = new PrintWriter(client.getOutputStream(), true);
+            this.sessionExpired = false; // Inizialmente la sessione non è scaduta
 
             this.timeoutTask = () -> {
                 try {
-                    if (clientInfo.isAuthenticated()) {
+                    if (clientInfo.isAuthenticated() && !sessionExpired) {
                         out.println("Sessione scaduta. Riaccedere.");
+
+                        sessionExpired = true; // Imposta il flag per evitare che il messaggio venga inviato più volte
+                        shutdown(); // Chiude la connessione
                     }
-                    System.out.println("User " + clientInfo.getNickname() + " inactive for " + inactivityTimeout + " seconds. Disconnecting...");
-                    shutdown();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -198,8 +201,10 @@ public class Server implements Runnable {
         }
 
         private boolean registerUser(String nickname, String password) {
+
             String checkSql = "SELECT COUNT(*) FROM Account WHERE Nickname = ?";
-            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            try (Connection conn = Database.getInstance().getConnection();
+                    PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
                 checkStmt.setString(1, nickname);
                 ResultSet rs = checkStmt.executeQuery();
                 if (rs.next() && rs.getInt(1) > 0) {
@@ -213,7 +218,8 @@ public class Server implements Runnable {
             }
 
             String sql = "INSERT INTO Account (Nickname, Password) VALUES (?, ?)";
-            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (Connection conn = Database.getInstance().getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 stmt.setString(2, password);
                 stmt.executeUpdate();
@@ -226,8 +232,10 @@ public class Server implements Runnable {
         }
 
         private boolean validateLogin(String nickname, String password) {
+
             String sql = "SELECT Password FROM Account WHERE Nickname = ?";
-            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (Connection conn = Database.getInstance().getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
