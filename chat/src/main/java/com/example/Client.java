@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 
@@ -100,10 +101,7 @@ public class Client implements Runnable {
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
                     gui.setVisible(false); // Nasconde la finestra di chat
-                    loginFrame.setVisible(true); // Mostra la finestra di login
                     showError("Sessione scaduta. Riaccedere.");
-                    // Svuota il campo della password
-                    loginFrame.clearPasswordField();
                 }
             });
 
@@ -136,14 +134,6 @@ public class Client implements Runnable {
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            // Qui non nascondiamo immediatamente la finestra di login
-            SwingUtilities.invokeLater(new Runnable() {
-                public void run() {
-                    // Solo quando l'utente clicca l'errore, la finestra di login sparisce
-                    loginFrame.setVisible(true); // Mostra la finestra di login
-                }
-            });
         }
     }
 
@@ -155,8 +145,31 @@ public class Client implements Runnable {
     }
 
     // Metodo per mostrare un messaggio di errore tramite gui
+    // Metodo per mostrare un messaggio di errore tramite gui
     private void showError(String message) {
-        JOptionPane.showMessageDialog(gui, message, "Errore", JOptionPane.ERROR_MESSAGE);
+        // Creazione di un JOptionPane personalizzato con un pulsante "Chiudi"
+        JOptionPane optionPane = new JOptionPane(
+                message,
+                JOptionPane.ERROR_MESSAGE,
+                JOptionPane.DEFAULT_OPTION,
+                null,
+                new Object[] { "Chiudi" }, // Aggiungi il pulsante "Chiudi"
+                null);
+
+        // Crea una finestra di dialogo con il JOptionPane personalizzato
+        JDialog dialog = optionPane.createDialog(gui, "Errore");
+
+        // Aggiungi un listener per la chiusura
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setVisible(true);
+
+        // Dopo che l'utente ha cliccato "Chiudi", mostra la finestra di login
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                loginFrame.clearPasswordField(); // Metodo per svuotare il campo password
+                loginFrame.setVisible(true); // Mostra la finestra di login
+            }
+        });
     }
 
     // Getter per l'autenticazione
