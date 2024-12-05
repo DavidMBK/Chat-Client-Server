@@ -24,10 +24,10 @@ import com.example.config.Config;
 
 public class Server implements Runnable {
 
-    private CopyOnWriteArrayList<ConnectionHandler> connections; // Lista delle connessioni attive
+    private final CopyOnWriteArrayList<ConnectionHandler> connections; // Lista delle connessioni attive
     private ServerSocket server; // Socket server
-    private boolean done; // Indica lo stato del server
-    private ExecutorService executor; // Pool di thread per gestire le connessioni
+    private volatile boolean done; // Indica lo stato del server
+    private final ExecutorService executor; // Pool di thread per gestire le connessioni
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -35,6 +35,7 @@ public class Server implements Runnable {
         executor = Executors.newCachedThreadPool(); // Pool dinamico
     }
 
+    @Override
     public void run() {
         try {
             Config config = Config.getInstance();
@@ -45,7 +46,6 @@ public class Server implements Runnable {
 
             while (!done) {
                 Socket client = server.accept(); // Accetta nuove connessioni
-
                 Client clientInfo = new Client();
                 int inactivityTimeout = 15; // Timeout configurabile
 
@@ -62,16 +62,14 @@ public class Server implements Runnable {
         }
     }
 
-    // Invia un messaggio a tutti gli utenti autenticati
-    public void broadcast(String message) {
+    public void broadcast(String message, ConnectionHandler sender) {
         for (ConnectionHandler ch : connections) {
-            if (ch.isAuthenticated()) {
+            if (ch.isAuthenticated() && ch != sender) {
                 ch.sendMessage(message);
             }
         }
     }
 
-    // Aggiorna la lista degli utenti connessi
     public void updateUsersList() {
         Set<String> uniqueUsernames = new HashSet<>();
         for (ConnectionHandler ch : connections) {
@@ -81,10 +79,9 @@ public class Server implements Runnable {
         }
 
         String usersList = "/users_list " + String.join(",", uniqueUsernames);
-        broadcast(usersList);
+        broadcast(usersList, null); // broadcast a tutti gli utenti, quindi il sender è null
     }
 
-    // Arresta il server
     public void shutdown() {
         done = true;
         try {
@@ -101,50 +98,44 @@ public class Server implements Runnable {
         }
     }
 
-    // Classe interna per gestire la connessione di un singolo client
-    class ConnectionHandler implements Runnable {
-
-        private Socket client;
-        private BufferedReader in;
-        private PrintWriter out;
-        private Client clientInfo;
-        private ScheduledExecutorService scheduler;
+    private class ConnectionHandler implements Runnable {
+        private final Socket client;
+        private final BufferedReader in;
+        private final PrintWriter out;
+        private final Client clientInfo;
+        private final ScheduledExecutorService scheduler;
         private ScheduledFuture<?> timeoutFuture;
-        private Runnable timeoutTask;
-        private int inactivityTimeout;
+        private final Runnable timeoutTask;
+        private final int inactivityTimeout;
 
-        public ConnectionHandler(Socket client, Client clientInfo, int inactivityTimeout) {
+        public ConnectionHandler(Socket client, Client clientInfo, int inactivityTimeout) throws IOException {
             this.client = client;
             this.clientInfo = clientInfo;
             this.inactivityTimeout = inactivityTimeout;
             this.scheduler = new ScheduledThreadPoolExecutor(1);
+            this.in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+            this.out = new PrintWriter(client.getOutputStream(), true);
 
-            // Task per disconnettere l'utente inattivo
             this.timeoutTask = () -> {
                 try {
                     if (clientInfo.isAuthenticated()) {
                         out.println("Sessione scaduta. Riaccedere.");
                     }
                     System.out.println("User " + clientInfo.getNickname() + " inactive for " + inactivityTimeout + " seconds. Disconnecting...");
-                    shutdown(); // Disconnette solo questo client
+                    shutdown();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             };
-
         }
 
+        @Override
         public void run() {
             try {
-                out = new PrintWriter(client.getOutputStream(), true);
-                in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-
-                // Pianifica il primo timeout
                 timeoutFuture = scheduler.schedule(timeoutTask, inactivityTimeout, TimeUnit.SECONDS);
 
                 String message;
                 while ((message = in.readLine()) != null) {
-                    // Reset del timer di inattività
                     timeoutFuture.cancel(false);
                     timeoutFuture = scheduler.schedule(timeoutTask, inactivityTimeout, TimeUnit.SECONDS);
 
@@ -160,18 +151,17 @@ public class Server implements Runnable {
                         if (message.equals("/disconnect")) {
                             handleDisconnect();
                         } else {
-                            broadcast(clientInfo.getNickname() + ": " + message);
+                            broadcast(clientInfo.getNickname() + ": " + message, this);
                         }
                     }
                 }
             } catch (IOException e) {
                 System.err.println("Connection error with client: " + e.getMessage());
             } finally {
-                shutdown(); // Assicura la chiusura della connessione
+                shutdown();
             }
         }
 
-        // Gestione del login
         private synchronized void handleLogin(String message) {
             String[] parts = message.split("\\s+", 3);
             if (parts.length != 3) {
@@ -191,7 +181,6 @@ public class Server implements Runnable {
             }
         }
 
-        // Gestione della registrazione
         private synchronized void handleRegister(String message) {
             String[] parts = message.split("\\s+", 3);
             if (parts.length != 3) {
@@ -208,15 +197,12 @@ public class Server implements Runnable {
             }
         }
 
-        // Registra un nuovo utente nel database
         private boolean registerUser(String nickname, String password) {
-            // Prima controlliamo se il nickname esiste già nel database
             String checkSql = "SELECT COUNT(*) FROM Account WHERE Nickname = ?";
             try (Connection conn = Database.getInstance().getConnection(); PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
                 checkStmt.setString(1, nickname);
                 ResultSet rs = checkStmt.executeQuery();
                 if (rs.next() && rs.getInt(1) > 0) {
-                    // Se il nickname esiste già, invia un errore al client
                     out.println("/error Nickname già in uso. Scegli un altro nome.");
                     return false;
                 }
@@ -226,13 +212,11 @@ public class Server implements Runnable {
                 return false;
             }
 
-            // Se il nickname è disponibile, procediamo con la registrazione
             String sql = "INSERT INTO Account (Nickname, Password) VALUES (?, ?)";
             try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 stmt.setString(2, password);
                 stmt.executeUpdate();
-                out.println("/register_success");
                 return true;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -241,15 +225,13 @@ public class Server implements Runnable {
             }
         }
 
-        // Valida il login
         private boolean validateLogin(String nickname, String password) {
             String sql = "SELECT Password FROM Account WHERE Nickname = ?";
             try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
-                    String storedPassword = rs.getString("Password");
-                    return storedPassword.equals(password);
+                    return rs.getString("Password").equals(password);
                 }
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -257,7 +239,6 @@ public class Server implements Runnable {
             return false;
         }
 
-        // Invia un messaggio al client
         public void sendMessage(String message) {
             out.println(message);
         }
@@ -268,11 +249,11 @@ public class Server implements Runnable {
                     if (clientInfo.isAuthenticated()) {
                         out.println("Sessione scaduta. Riaccedere.");
                     }
-                    client.close();  // Chiudi la connessione del client
+                    client.close();
                 }
-                connections.remove(this); // Rimuovi dalla lista globale
+                connections.remove(this);
                 scheduler.shutdown();
-                updateUsersList(); // Aggiorna la lista degli utenti connessi
+                updateUsersList();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -293,7 +274,6 @@ public class Server implements Runnable {
 
     public static void main(String[] args) {
         Server server = new Server();
-        Thread serverThread = new Thread(server);
-        serverThread.start();
+        new Thread(server).start();
     }
 }
