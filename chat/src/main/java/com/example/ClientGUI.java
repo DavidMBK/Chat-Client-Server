@@ -6,36 +6,56 @@ import java.awt.event.*;
 
 public class ClientGUI extends JFrame {
 
-    private JTextField input; // Campo di testo per inserire i messaggi
-    private JTextArea chat; // Area di testo per visualizzare la chat
-    private JList<String> userList; // Lista per visualizzare gli utenti
-    private DefaultListModel<String> userListModel; // Modello per la lista degli utenti
-    private Client client; // Istanza del client
+    private JTextField input;
+    private JPanel chatPanel;
+    private JScrollPane chatScrollPane;
+    private JList<String> userList;
+    private DefaultListModel<String> userListModel;
+    private Client client;
 
-    // Costruttore della classe ClientGUI
     public ClientGUI(final Client client) {
-        this.client = client; // Assegna il client passato al costruttore
-        setTitle("Zuusmee"); // Imposta il titolo della finestra
-        setSize(500, 400); // Imposta la dimensione della finestra
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Imposta l'operazione di chiusura
-        setLocationRelativeTo(null); // Posiziona la finestra al centro dello schermo
+        this.client = client;
+        setTitle("Zuusmee - Telegram Style");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
 
-        // Inizializza l'area di testo per la chat e la rende non editabile
-        chat = new JTextArea();
-        chat.setEditable(false);
-        JScrollPane chatScrollPane = new JScrollPane(chat); // Aggiunge una barra di scorrimento alla chat
+        // Titolo grande dell'app
+        JLabel titleLabel = new JLabel("Zuusmee", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        titleLabel.setOpaque(true);
+        titleLabel.setBackground(new Color(0, 132, 255));
+        titleLabel.setForeground(Color.WHITE);
 
-        // Inizializza il campo di testo per l'input dei messaggi
+        chatPanel = new JPanel();
+        chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
+        chatPanel.setBackground(new Color(245, 245, 245));
+
+        chatScrollPane = new JScrollPane(chatPanel);
+        chatScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
         input = new JTextField();
-        input.addActionListener(new ActionListener() { // Aggiunge un'azione quando si preme l'invio
+        input.setFont(new Font("Arial", Font.PLAIN, 14));
+        input.setBackground(new Color(255, 255, 255));
+        input.setForeground(Color.BLACK);
+        input.setBorder(BorderFactory.createCompoundBorder(
+            input.getBorder(), 
+            BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        ));
+        input.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 sendMessage();
             }
         });
 
-        // Crea il pulsante invia
         JButton send = new JButton("Invia");
+        send.setFont(new Font("Arial", Font.BOLD, 14));
+        send.setBackground(new Color(0, 132, 255));
+        send.setForeground(Color.WHITE);
+        send.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        send.setFocusPainted(false);
         send.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -43,74 +63,81 @@ public class ClientGUI extends JFrame {
             }
         });
 
-        // Pannello con Campo di input
         JPanel bottom = new JPanel(new BorderLayout());
-        bottom.add(input, BorderLayout.CENTER); // Aggiunge il testo input al centro
-        bottom.add(send, BorderLayout.EAST); // Aggiunge il pulsante a destra
+        bottom.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        bottom.add(input, BorderLayout.CENTER);
+        bottom.add(send, BorderLayout.EAST);
 
-        // Inizializza il modello della lista degli utenti
-        // Per vedere online/offline
         userListModel = new DefaultListModel<>();
-        userList = new JList<>(userListModel); // Inizializza la lista degli utenti con il modello
-        JScrollPane userScrollPane = new JScrollPane(userList); // barra per scrollare
-        userScrollPane.setPreferredSize(new Dimension(150, 0)); // Default barra size
+        userList = new JList<>(userListModel);
+        userList.setFont(new Font("Arial", Font.PLAIN, 14));
+        userList.setBackground(new Color(245, 245, 245));
+        userList.setForeground(Color.BLACK);
+        userList.setSelectionBackground(new Color(0, 132, 255));
+        userList.setSelectionForeground(Color.WHITE);
 
-        // Imposta il layout del contenitore principale
+        JPanel userListPanel = new JPanel(new BorderLayout());
+        userListPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JLabel userListLabel = new JLabel("Utenti");
+        userListLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        userListLabel.setHorizontalAlignment(JLabel.CENTER);
+        userListLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        userListPanel.add(userListLabel, BorderLayout.NORTH);
+        userListPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
+        userListPanel.setPreferredSize(new Dimension(200, 0));
+
         getContentPane().setLayout(new BorderLayout());
-        getContentPane().add(chatScrollPane, BorderLayout.CENTER); // Aggiunge la chat al centro
-        getContentPane().add(bottom, BorderLayout.SOUTH); // Aggiunge il pannello inferiore in basso
-        getContentPane().add(userScrollPane, BorderLayout.EAST); // Aggiunge la lista degli utenti a destra
+        getContentPane().add(titleLabel, BorderLayout.NORTH);
+        getContentPane().add(chatScrollPane, BorderLayout.CENTER);
+        getContentPane().add(bottom, BorderLayout.SOUTH);
+        getContentPane().add(userListPanel, BorderLayout.EAST);
 
-        // Chiude le finestre
         this.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                final Client finalClient = client; // Dichiarazione final per la variabile client
-                finalClient.sendMessage("/disconnect"); // Invia il messaggio di disconnessione
-                super.windowClosing(e); // Chiama il metodo della superclasse
+                client.sendMessage("/disconnect");
+                super.windowClosing(e);
             }
         });
     }
 
-    // Metodo per inviare un messaggio
     private void sendMessage() {
-        String message = input.getText().trim(); // Ottiene il testo dal campo di input e rimuove gli spazi
-        if (!message.isEmpty()) { // Controlla se il messaggio non è vuoto
-
-            // Invia il messaggio al client
+        String message = input.getText().trim();
+        if (!message.isEmpty()) {
+            appendMessage(message, true);
             client.sendMessage(message);
-            // Resetta il campo di input
             input.setText("");
         }
     }
 
-    // Metodo per aggiungere un messaggio alla chat
-    public void appendMessage(String message) {
-        chat.append(message + "\n"); // Aggiunge il messaggio alla chat
+    public void appendMessage(String message, boolean sentByUser) {
+        MessageBubble bubble = new MessageBubble(message, sentByUser);
+        chatPanel.add(bubble);
+        chatPanel.revalidate();
+        chatScrollPane.getVerticalScrollBar().setValue(chatScrollPane.getVerticalScrollBar().getMaximum());
     }
 
-    // Metodo per aggiornare la lista degli utenti
     public void updateUsersList(final String[] users) {
-        SwingUtilities.invokeLater(new Runnable() // aggiorna la interfaccia grafica ad ogni modifica
-        {
+        SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-                userListModel.clear(); // Pulisce il modello della lista
+                userListModel.clear();
                 for (String user : users) {
-                    userListModel.addElement(user); // Aggiunge ogni utente al modello della lista
+                    userListModel.addElement(user);
                 }
             }
         });
     }
 
-    // Metodo per rimuovere le istruzioni dalla chat
     public void removeInstructions() {
-        chat.setText("");
+        chatPanel.removeAll();
+        chatPanel.revalidate();
+        chatPanel.repaint();
     }
 
     public static void main(String[] args) {
-        Client client = new Client(); // Crea una nuova istanza del client
-        ClientGUI gui = new ClientGUI(client); // Crea una nuova istanza della GUI
-        gui.setVisible(true); // Rende visibile la GUI
+        Client client = new Client();
+        ClientGUI gui = new ClientGUI(client);
+        gui.setVisible(true);
     }
 }

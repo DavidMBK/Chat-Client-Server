@@ -1,14 +1,22 @@
 package com.example;
 
-import javax.swing.*;
-import com.example.config.Config;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.Socket;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
+import javax.swing.JDialog;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+
+import com.example.config.Config;
 
 public class Client implements Runnable {
 
@@ -64,7 +72,7 @@ public class Client implements Runnable {
         }
     }
 
-// Metodo per processare i messaggi ricevuti dal server
+    // Metodo per processare i messaggi ricevuti dal server
     private void processMessage(String message) {
         if (message.startsWith("/login_success")) {
             isAuthenticated = true;
@@ -72,7 +80,7 @@ public class Client implements Runnable {
                 public void run() {
                     loginFrame.setVisible(false); // Nasconde la finestra di login
                     gui.setVisible(true); // Mostra la finestra principale del client
-                    gui.appendMessage("Benvenuto su Zuusmee, " + getNickname() + "!");
+                    gui.appendMessage("Benvenuto su Zuusmee, " + getNickname() + "!", false);
                 }
             });
         } else if (message.startsWith("/register_success")) {
@@ -93,21 +101,16 @@ public class Client implements Runnable {
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
                     gui.setVisible(false); // Nasconde la finestra di chat
-                    loginFrame.setVisible(true); // Mostra la finestra di login
                     showError("Sessione scaduta. Riaccedere.");
-
-                    // Svuota il campo della password
-                    loginFrame.clearPasswordField();
                 }
             });
 
             // Riconnessione: resetta e avvia di nuovo il ciclo
             resetConnection();
         } else {
-            gui.appendMessage(message); // Aggiunge qualsiasi altro messaggio alla chat
+            gui.appendMessage(message, false); // Aggiunge qualsiasi altro messaggio alla chat
         }
     }
-
 
     // Metodo per processare la lista degli utenti
     private void processUsersList(String message) {
@@ -131,14 +134,6 @@ public class Client implements Runnable {
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            // Mostra la finestra di login in caso di disconnessione
-            SwingUtilities.invokeLater(new Runnable() {
-                public void run() {
-                    gui.setVisible(false); // Nasconde la finestra principale
-                    loginFrame.setVisible(true); // Mostra la finestra di login
-                }
-            });
         }
     }
 
@@ -150,8 +145,31 @@ public class Client implements Runnable {
     }
 
     // Metodo per mostrare un messaggio di errore tramite gui
+    // Metodo per mostrare un messaggio di errore tramite gui
     private void showError(String message) {
-        JOptionPane.showMessageDialog(gui, message, "Errore", JOptionPane.ERROR_MESSAGE);
+        // Creazione di un JOptionPane personalizzato con un pulsante "Chiudi"
+        JOptionPane optionPane = new JOptionPane(
+                message,
+                JOptionPane.ERROR_MESSAGE,
+                JOptionPane.DEFAULT_OPTION,
+                null,
+                new Object[] { "Chiudi" }, // Aggiungi il pulsante "Chiudi"
+                null);
+
+        // Crea una finestra di dialogo con il JOptionPane personalizzato
+        JDialog dialog = optionPane.createDialog(gui, "Errore");
+
+        // Aggiungi un listener per la chiusura
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setVisible(true);
+
+        // Dopo che l'utente ha cliccato "Chiudi", mostra la finestra di login
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                loginFrame.clearPasswordField(); // Metodo per svuotare il campo password
+                loginFrame.setVisible(true); // Mostra la finestra di login
+            }
+        });
     }
 
     // Getter per l'autenticazione
@@ -195,9 +213,9 @@ public class Client implements Runnable {
 
     // Metodo per resettare la connessione (riavvia il processo da capo)
     private void resetConnection() {
-        shutdown();  // Chiude la connessione corrente
-        isAuthenticated = false;  // Reset dell'autenticazione
-        run();  // Riconnette e riavvia tutto
+        shutdown(); // Chiude la connessione corrente
+        isAuthenticated = false; // Reset dell'autenticazione
+        run(); // Riconnette e riavvia tutto
     }
 
     public static void main(String[] args) {
