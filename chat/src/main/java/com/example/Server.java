@@ -99,6 +99,7 @@ public class Server implements Runnable {
     }
 
     private class ConnectionHandler implements Runnable {
+
         private final Socket client;
         private final BufferedReader in;
         private final PrintWriter out;
@@ -147,6 +148,10 @@ public class Server implements Runnable {
                             handleLogin(message);
                         } else if (message.startsWith("/register ")) {
                             handleRegister(message);
+                        } else if (message.startsWith("/change_password ")) {
+                            handleChangePassword(message);
+                        } else if (message.startsWith("/change_name ")) {
+                            handleChangeName(message);
                         } else {
                             out.println("You must login/register first.");
                         }
@@ -200,11 +205,72 @@ public class Server implements Runnable {
             }
         }
 
+        private void handleChangePassword(String message) {
+            String[] parts = message.split("\\s+", 2);
+            if (parts.length != 2) {
+                out.println("/error Formato errato. Usa: /change_password <nuova_password>");
+                return;
+            }
+
+            String newPassword = parts[1];
+            String sql = "UPDATE Account SET Password = ? WHERE Nickname = ?";
+
+            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, newPassword);
+                stmt.setString(2, clientInfo.getNickname());
+                stmt.executeUpdate();
+                out.println("/change_password_success Password aggiornata con successo.");
+            } catch (SQLException e) {
+                e.printStackTrace();
+                out.println("/error Errore durante l'aggiornamento della password.");
+            }
+        }
+
+        private void handleChangeName(String message) {
+            String[] parts = message.split("\\s+", 2);
+            if (parts.length != 2) {
+                out.println("/error Formato errato. Usa: /change_name <nuovo_nome>");
+                return;
+            }
+        
+            String newName = parts[1];
+            String checkSql = "SELECT COUNT(*) FROM Account WHERE Nickname = ?";
+        
+            try (Connection conn = Database.getInstance().getConnection();
+                 PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                checkStmt.setString(1, newName);
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next() && rs.getInt(1) > 0) {
+                    out.println("/error Nome già in uso. Scegli un altro nome.");
+                    return;
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                out.println("/error Errore durante il controllo del nome.");
+                return;
+            }
+        
+            String updateSql = "UPDATE Account SET Nickname = ? WHERE Nickname = ?";
+        
+            try (Connection conn = Database.getInstance().getConnection();
+                 PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                updateStmt.setString(1, newName);
+                updateStmt.setString(2, clientInfo.getNickname());
+                updateStmt.executeUpdate();
+                clientInfo.setNickname(newName);
+                out.println("/change_name_success Nome aggiornato con successo.");
+                updateUsersList();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                out.println("/error Errore durante l'aggiornamento del nome.");
+            }
+        }
+        
+
         private boolean registerUser(String nickname, String password) {
 
             String checkSql = "SELECT COUNT(*) FROM Account WHERE Nickname = ?";
-            try (Connection conn = Database.getInstance().getConnection();
-                    PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
                 checkStmt.setString(1, nickname);
                 ResultSet rs = checkStmt.executeQuery();
                 if (rs.next() && rs.getInt(1) > 0) {
@@ -218,8 +284,7 @@ public class Server implements Runnable {
             }
 
             String sql = "INSERT INTO Account (Nickname, Password) VALUES (?, ?)";
-            try (Connection conn = Database.getInstance().getConnection();
-                    PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 stmt.setString(2, password);
                 stmt.executeUpdate();
@@ -234,8 +299,7 @@ public class Server implements Runnable {
         private boolean validateLogin(String nickname, String password) {
 
             String sql = "SELECT Password FROM Account WHERE Nickname = ?";
-            try (Connection conn = Database.getInstance().getConnection();
-                    PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (Connection conn = Database.getInstance().getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, nickname);
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
@@ -246,6 +310,7 @@ public class Server implements Runnable {
             }
             return false;
         }
+
 
         public void sendMessage(String message) {
             out.println(message);
