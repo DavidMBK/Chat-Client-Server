@@ -1,11 +1,13 @@
 package com.example;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -22,6 +24,12 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
+
 import com.example.config.Config;
 
 public class Server implements Runnable {
@@ -30,6 +38,7 @@ public class Server implements Runnable {
     private ServerSocket server; // Socket server
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
+    private SSLServerSocket serverSocket;
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -40,14 +49,39 @@ public class Server implements Runnable {
     @Override
     public void run() {
         try {
+            // Ottieni la configurazione
             Config config = Config.getInstance();
-            int serverPort = config.getServerPort(); // Ottieni la porta dal file di configurazione
+            int serverPort = config.getServerPort(); // Porta del server dal file di configurazione
 
-            server = new ServerSocket(serverPort);
-            System.out.println("Server started on port " + serverPort);
+            // Carica il keystore per SSL
+            char[] keystorePassword = "Prova1234!".toCharArray(); // Password del keystore
+            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            try (FileInputStream keystoreFile = new FileInputStream("server.keystore")) {
+                keystore.load(keystoreFile, keystorePassword);
+            }
 
+            // Inizializza KeyManagerFactory con il keystore
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory
+                    .getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keystore, keystorePassword);
+
+            // Inizializza TrustManagerFactory con il keystore
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(keystore);
+
+            // Crea un contesto SSL
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
+
+            // Crea un server socket SSL
+            SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+            server = (SSLServerSocket) factory.createServerSocket(serverPort);
+            System.out.println("SSL server started on port " + serverPort);
+
+            // Ascolta e accetta connessioni in arrivo
             while (!done) {
-                Socket client = server.accept(); // Accetta nuove connessioni
+                Socket client = server.accept(); // Accetta la connessione sicura
                 Client clientInfo = new Client();
                 int inactivityTimeout = 20; // Timeout configurabile
 
@@ -56,9 +90,9 @@ public class Server implements Runnable {
                 connections.add(handler); // Aggiungi alla lista delle connessioni
                 executor.execute(handler); // Esegui il gestore in un thread separato
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             if (!done) {
-                System.err.println("Error starting server: " + e.getMessage());
+                System.err.println("Error starting SSL server: " + e.getMessage());
             }
             shutdown();
         }
@@ -212,25 +246,31 @@ public class Server implements Runnable {
             String[] parts = message.split("\\s+", 2);
             if (parts.length != 2) {
                 out.println("/error Formato errato. Usa: /change_password <nuova_password>");
-                return;
-            }
+            } else {
+                String newPassword = parts[1];
 
-            String newPassword = parts[1];
+                // Controllo della password con il pattern
+                String passwordPattern = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*(),.?\":{}|<>])[A-Za-z\\d!@#$%^&*(),.?\":{}|<>]{8,}$";
+                if (!newPassword.matches(passwordPattern)) {
+                    out.println(
+                            "/error La password deve contenere almeno una lettera maiuscola, una lettera minuscola, un numero e un carattere speciale.");
+                } else {
+                    // Hash della nuova password con SHA-256
+                    String hashedPassword = hashPassword(newPassword);
 
-            // Hash della nuova password con SHA-256
-            String hashedPassword = hashPassword(newPassword);
+                    String sql = "UPDATE Account SET Password = ? WHERE Nickname = ?";
 
-            String sql = "UPDATE Account SET Password = ? WHERE Nickname = ?";
-
-            try (Connection conn = Database.getInstance().getConnection();
-                    PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.setString(1, hashedPassword); // Salviamo la password hashed nel DB
-                stmt.setString(2, clientInfo.getNickname());
-                stmt.executeUpdate();
-                out.println("Password aggiornata con successo.");
-            } catch (SQLException e) {
-                e.printStackTrace();
-                out.println("/error Errore durante l'aggiornamento della password.");
+                    try (Connection conn = Database.getInstance().getConnection();
+                            PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, hashedPassword); // Salviamo la password hashed nel DB
+                        stmt.setString(2, clientInfo.getNickname());
+                        stmt.executeUpdate();
+                        out.println("Password aggiornata con successo.");
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        out.println("Errore durante l'aggiornamento della password.");
+                    }
+                }
             }
         }
 
