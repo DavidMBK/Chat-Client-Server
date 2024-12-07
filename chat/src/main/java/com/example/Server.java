@@ -38,7 +38,6 @@ public class Server implements Runnable {
     private ServerSocket server; // Socket server
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
-    private SSLServerSocket serverSocket;
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -52,11 +51,11 @@ public class Server implements Runnable {
             // Ottieni la configurazione
             Config config = Config.getInstance();
             int serverPort = config.getServerPort(); // Porta del server dal file di configurazione
-
+            String sslpassword = config.getSSLPassword();
             // Carica il keystore per SSL
-            char[] keystorePassword = "Prova1234!".toCharArray(); // Password del keystore
+            char[] keystorePassword = sslpassword.toCharArray(); // Password del keystore
             KeyStore keystore = KeyStore.getInstance("PKCS12");
-            try (FileInputStream keystoreFile = new FileInputStream("server.keystore")) {
+            try (FileInputStream keystoreFile = new FileInputStream("SSL-TLS/server.keystore")) {
                 keystore.load(keystoreFile, keystorePassword);
             }
 
@@ -83,7 +82,7 @@ public class Server implements Runnable {
             while (!done) {
                 Socket client = server.accept(); // Accetta la connessione sicura
                 Client clientInfo = new Client();
-                int inactivityTimeout = 20; // Timeout configurabile
+                int inactivityTimeout = config.getTimeout(); // Timeout configurabile
 
                 // Crea un gestore per il client
                 ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);

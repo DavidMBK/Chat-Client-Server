@@ -69,4 +69,12 @@ public class Config {
         // Ottiene il valore dell'elemento "dbPassword" dal documento XML.
         return doc.getElementsByTagName("dbPassword").item(0).getTextContent();
     }
+
+    public String getSSLPassword() {
+        return doc.getElementsByTagName("sslPassword").item(0).getTextContent();
+    }
+
+    public int getTimeout() {
+        return Integer.parseInt(doc.getElementsByTagName("timeout").item(0).getTextContent());
+    }
 }

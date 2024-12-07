@@ -5,8 +5,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.security.KeyStore;
 import java.security.MessageDigest;
-import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -14,7 +14,7 @@ import java.util.Set;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -25,6 +25,7 @@ public class Client implements Runnable {
     private SSLSocket client; // SSLSocket per la connessione sicura
     private BufferedReader in; // Stream per leggere i dati dal server
     private PrintWriter out; // Stream per inviare i dati al server
+    @SuppressWarnings("unused")
     private boolean done; // Flag per indicare se il client è in fase di chiusura
     private ClientGUI gui; // Interfaccia grafica del client
     private LoginFrame loginFrame; // Finestra di login
@@ -45,46 +46,44 @@ public class Client implements Runnable {
     // Metodo per connettersi al server tramite SSL
     private void connectToServer() {
         try {
-            // Carica la configurazione dal file di configurazione
+            // Load configuration from config file
             Config config = Config.getInstance();
             String serverIp = config.getServerIp();
             int serverPort = config.getServerPort();
 
-            // Configura SSLContext con un TrustManager che accetta qualsiasi certificato
+            // Load the client truststore containing trusted certificates
+            char[] trustStorePassword = config.getSSLPassword().toCharArray();
+
+            KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            try (FileInputStream trustStoreFile = new FileInputStream("SSL-TLS/client.truststore")) {
+                trustStore.load(trustStoreFile, trustStorePassword);
+            }
+
+            // Create a TrustManagerFactory with the loaded truststore
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
+
+            // Configure SSLContext with the TrustManager from the truststore
             SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new javax.net.ssl.TrustManager[] {
-                    new X509TrustManager() {
-                        public X509Certificate[] getAcceptedIssuers() {
-                            return null; // Accetta qualsiasi certificato
-                        }
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), new java.security.SecureRandom());
 
-                        public void checkClientTrusted(X509Certificate[] certs, String authType)
-                                throws java.security.cert.CertificateException {
-                        }
-
-                        public void checkServerTrusted(X509Certificate[] certs, String authType)
-                                throws java.security.cert.CertificateException {
-                            // Non fa nulla, accetta qualsiasi certificato
-                        }
-                    }
-            }, new java.security.SecureRandom());
-
-            // Ottieni la SSLSocketFactory e crea una connessione SSL
+            // Get the SSLSocketFactory and create a secure connection
             SSLSocketFactory socketFactory = sslContext.getSocketFactory();
             client = (SSLSocket) socketFactory.createSocket(serverIp, serverPort);
 
-            // Inizializza gli stream
+            // Initialize streams
             out = new PrintWriter(client.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(client.getInputStream()));
 
-            // Mostra la finestra di login
+            // Show the login window
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
                     loginFrame.setVisible(true);
                 }
             });
 
-            // Legge i messaggi dal server
+            // Read messages from the server
             String inMessage;
             while ((inMessage = in.readLine()) != null) {
                 processMessage(inMessage);
@@ -92,7 +91,7 @@ public class Client implements Runnable {
 
         } catch (Exception e) {
             showError("Error connecting to the server.");
-            shutdown(); // Chiude le risorse
+            shutdown(); // Close resources
         }
     }
 

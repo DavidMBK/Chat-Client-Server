@@ -9,6 +9,7 @@ public class LoginFrame extends JFrame {
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JButton loginButton;
+    @SuppressWarnings("unused")
     private Client client;
 
     public LoginFrame(Client client) {
