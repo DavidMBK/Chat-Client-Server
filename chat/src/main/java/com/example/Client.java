@@ -1,12 +1,22 @@
 package com.example;
 
-import javax.swing.*;
-import com.example.config.Config;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.Socket;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
+import javax.swing.JDialog;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+
+import com.example.config.Config;
 
 public class Client implements Runnable {
 
@@ -15,16 +25,23 @@ public class Client implements Runnable {
     private PrintWriter out; // Stream per inviare i dati al server
     private boolean done; // Flag per indicare se il client è in fase di chiusura
     private ClientGUI gui; // Riferimento all'interfaccia grafica del client
+    private LoginFrame loginFrame; // Finestra di login
     private boolean isAuthenticated; // Flag per indicare se l'utente è autenticato
     private String nickname; // Nickname dell'utente
 
     public Client() {
-        gui = new ClientGUI(this); // Inizializza l'interfaccia grafica
+        gui = new ClientGUI(this); // Inizializza l'interfaccia grafica del client
+        loginFrame = new LoginFrame(this); // Inizializza la finestra di login
         isAuthenticated = false; // Imposta l'autenticazione a false
         nickname = ""; // Imposta il nickname vuoto
     }
 
     public void run() {
+        connectToServer();
+    }
+
+    // Metodo per connettersi al server
+    private void connectToServer() {
         try {
             // Carica la configurazione dal file di configurazione
             Config config = Config.getInstance();
@@ -36,10 +53,12 @@ public class Client implements Runnable {
             out = new PrintWriter(client.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(client.getInputStream()));
 
-            // Inizia un thread separato per gestire gli input da tastiera
-            InputHandler inHandler = new InputHandler();
-            Thread t = new Thread(inHandler);
-            t.start();
+            // Mostra la finestra di login
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    loginFrame.setVisible(true);
+                }
+            });
 
             // Legge i messaggi dal server
             String inMessage;
@@ -57,14 +76,39 @@ public class Client implements Runnable {
     private void processMessage(String message) {
         if (message.startsWith("/login_success")) {
             isAuthenticated = true;
-            gui.removeInstructions(); // Rimuove le istruzioni dalla chat
-            gui.appendMessage("Login successful!");
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    loginFrame.setVisible(false); // Nasconde la finestra di login
+                    gui.setVisible(true); // Mostra la finestra principale del client
+                    gui.appendMessage("Benvenuto su Zuusmee, " + getNickname() + "!", false);
+                }
+            });
         } else if (message.startsWith("/register_success")) {
-            gui.appendMessage("Registration successful!");
+            // Simula il click del pulsante login dopo la registrazione
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    loginFrame.simulateLogin();
+                }
+            });
+        } else if (message.startsWith("/error")) {
+            // Gestisce i messaggi di errore per login o registrazione
+            String errorMessage = message.replace("/error ", "");
+            showError(errorMessage);
         } else if (message.startsWith("/users_list")) {
             processUsersList(message); // Processa la lista degli utenti
+        } else if (message.equals("Sessione scaduta. Riaccedere.")) {
+            // Gestione sessione scaduta
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    gui.setVisible(false); // Nasconde la finestra di chat
+                    showError("Sessione scaduta. Riaccedere.");
+                }
+            });
+
+            // Riconnessione: resetta e avvia di nuovo il ciclo
+            resetConnection();
         } else {
-            gui.appendMessage(message); // Aggiunge qualsiasi altro messaggio alla chat
+            gui.appendMessage(message, false); // Aggiunge qualsiasi altro messaggio alla chat
         }
     }
 
@@ -79,10 +123,12 @@ public class Client implements Runnable {
     public void shutdown() {
         done = true;
         try {
-            if (in != null)
+            if (in != null) {
                 in.close(); // Chiusura risorse lettura
-            if (out != null)
-                out.close(); // Chiusura risorse Scrittura
+            }
+            if (out != null) {
+                out.close(); // Chiusura risorse scrittura
+            }
             if (client != null && !client.isClosed()) {
                 client.close(); // Chiude il client
             }
@@ -100,7 +146,19 @@ public class Client implements Runnable {
 
     // Metodo per mostrare un messaggio di errore tramite gui
     private void showError(String message) {
-        JOptionPane.showMessageDialog(gui, message, "Error", JOptionPane.ERROR_MESSAGE);
+        // Crea una finestra di dialogo separata per gli errori di password
+        JOptionPane optionPane = new JOptionPane(
+                message,
+                JOptionPane.ERROR_MESSAGE,
+                JOptionPane.DEFAULT_OPTION,
+                null,
+                new Object[] { "Chiudi" }, // Aggiungi il pulsante "Chiudi"
+                null);
+
+        // Crea un JDialog separato per l'errore di password
+        JDialog dialog = optionPane.createDialog(gui, "Errore Cambio Password");
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setVisible(true);
     }
 
     // Getter per l'autenticazione
@@ -123,22 +181,30 @@ public class Client implements Runnable {
         this.nickname = nickname.toLowerCase(); // Lowercase per chi accede
     }
 
-    // Classe interna per gestire l'input da tastiera
-    class InputHandler implements Runnable {
-        public void run() {
-            try {
-                BufferedReader inReader = new BufferedReader(new InputStreamReader(System.in));
-                while (!done) {
-                    String messageText = inReader.readLine();
-                    if (!messageText.trim().isEmpty()) {
-                        sendMessage(messageText); // Se legge e il messaggio non è vuoto, lo invia.
-                    }
+    // Metodo per hashare una password con SHA-256
+    public static String hashPassword(String password) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(password.getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
                 }
-            } catch (IOException e) {
-                showError("Error reading input.");
-                shutdown();
+                hexString.append(hex);
             }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
+    }
+
+    // Metodo per resettare la connessione (riavvia il processo da capo)
+    private void resetConnection() {
+        shutdown(); // Chiude la connessione corrente
+        isAuthenticated = false; // Reset dell'autenticazione
+        run(); // Riconnette e riavvia tutto
     }
 
     public static void main(String[] args) {
@@ -146,7 +212,7 @@ public class Client implements Runnable {
         // Avvia l'interfaccia grafica nel thread dell'Event Dispatch Thread
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                client.gui.setVisible(true); // Rende visibile la GUI
+                client.loginFrame.setVisible(true); // Mostra la finestra di login
             }
         });
         Thread clientThread = new Thread(client); // Crea un thread per eseguire il client
