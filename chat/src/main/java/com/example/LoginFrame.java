@@ -81,12 +81,31 @@ public class LoginFrame extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 String nickname = usernameField.getText().trim();
                 String password = new String(passwordField.getPassword());
+
+                // Controllo che la password non sia vuota
                 if (password.isEmpty()) {
                     showError("Password cannot be empty!");
-                } else {
-                    String hashedPassword = Client.hashPassword(password);
-                    client.sendMessage("/register " + nickname + " " + hashedPassword);
+                    return;
                 }
+
+                // Controllo sulla lunghezza della password
+                if (password.length() < 8) {
+                    showError("Password must be at least 8 characters long.");
+                    return;
+                }
+
+                // Controllo per verificare che la password contenga almeno una lettera
+                // maiuscola, una minuscola, un numero e un carattere speciale
+                String passwordPattern = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*(),.?\":{}|<>])[A-Za-z\\d!@#$%^&*(),.?\":{}|<>]{8,}$";
+                if (!password.matches(passwordPattern)) {
+                    showError(
+                            "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.");
+                    return;
+                }
+
+                // Se tutto è ok, invia il messaggio al server
+                String hashedPassword = Client.hashPassword(password);
+                client.sendMessage("/register " + nickname + " " + hashedPassword);
             }
         });
         gbc.gridx = 1;
