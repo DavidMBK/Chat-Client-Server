@@ -1,32 +1,34 @@
 package com.example;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
-import java.net.Socket;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.X509TrustManager;
 import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-
 import com.example.config.Config;
 
 public class Client implements Runnable {
 
-    private Socket client; // Socket utilizzato per la connessione con il server
+    private SSLSocket client; // SSLSocket per la connessione sicura
     private BufferedReader in; // Stream per leggere i dati dal server
     private PrintWriter out; // Stream per inviare i dati al server
     private boolean done; // Flag per indicare se il client è in fase di chiusura
-    private ClientGUI gui; // Riferimento all'interfaccia grafica del client
+    private ClientGUI gui; // Interfaccia grafica del client
     private LoginFrame loginFrame; // Finestra di login
-    private boolean isAuthenticated; // Flag per indicare se l'utente è autenticato
+    private boolean isAuthenticated; // Flag per l'autenticazione
     private String nickname; // Nickname dell'utente
 
     public Client() {
@@ -40,7 +42,7 @@ public class Client implements Runnable {
         connectToServer();
     }
 
-    // Metodo per connettersi al server
+    // Metodo per connettersi al server tramite SSL
     private void connectToServer() {
         try {
             // Carica la configurazione dal file di configurazione
@@ -48,8 +50,30 @@ public class Client implements Runnable {
             String serverIp = config.getServerIp();
             int serverPort = config.getServerPort();
 
-            // Connessione al server
-            client = new Socket(serverIp, serverPort);
+            // Configura SSLContext con un TrustManager che accetta qualsiasi certificato
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new javax.net.ssl.TrustManager[] {
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return null; // Accetta qualsiasi certificato
+                        }
+
+                        public void checkClientTrusted(X509Certificate[] certs, String authType)
+                                throws java.security.cert.CertificateException {
+                        }
+
+                        public void checkServerTrusted(X509Certificate[] certs, String authType)
+                                throws java.security.cert.CertificateException {
+                            // Non fa nulla, accetta qualsiasi certificato
+                        }
+                    }
+            }, new java.security.SecureRandom());
+
+            // Ottieni la SSLSocketFactory e crea una connessione SSL
+            SSLSocketFactory socketFactory = sslContext.getSocketFactory();
+            client = (SSLSocket) socketFactory.createSocket(serverIp, serverPort);
+
+            // Inizializza gli stream
             out = new PrintWriter(client.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(client.getInputStream()));
 
@@ -66,7 +90,7 @@ public class Client implements Runnable {
                 processMessage(inMessage);
             }
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             showError("Error connecting to the server.");
             shutdown(); // Chiude le risorse
         }
@@ -195,7 +219,7 @@ public class Client implements Runnable {
                 hexString.append(hex);
             }
             return hexString.toString();
-        } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -216,6 +240,6 @@ public class Client implements Runnable {
             }
         });
         Thread clientThread = new Thread(client); // Crea un thread per eseguire il client
-        clientThread.start(); // Avvia il thread del client
+        clientThread.start(); // Avvia il client
     }
 }

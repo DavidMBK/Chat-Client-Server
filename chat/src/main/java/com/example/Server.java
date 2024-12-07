@@ -1,11 +1,13 @@
 package com.example;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -22,6 +24,12 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
+
 import com.example.config.Config;
 
 public class Server implements Runnable {
@@ -30,6 +38,7 @@ public class Server implements Runnable {
     private ServerSocket server; // Socket server
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
+    private SSLServerSocket serverSocket;
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -40,14 +49,39 @@ public class Server implements Runnable {
     @Override
     public void run() {
         try {
+            // Ottieni la configurazione
             Config config = Config.getInstance();
-            int serverPort = config.getServerPort(); // Ottieni la porta dal file di configurazione
+            int serverPort = config.getServerPort(); // Porta del server dal file di configurazione
 
-            server = new ServerSocket(serverPort);
-            System.out.println("Server started on port " + serverPort);
+            // Carica il keystore per SSL
+            char[] keystorePassword = "Prova1234!".toCharArray(); // Password del keystore
+            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            try (FileInputStream keystoreFile = new FileInputStream("server.keystore")) {
+                keystore.load(keystoreFile, keystorePassword);
+            }
 
+            // Inizializza KeyManagerFactory con il keystore
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory
+                    .getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keystore, keystorePassword);
+
+            // Inizializza TrustManagerFactory con il keystore
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(keystore);
+
+            // Crea un contesto SSL
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
+
+            // Crea un server socket SSL
+            SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+            server = (SSLServerSocket) factory.createServerSocket(serverPort);
+            System.out.println("SSL server started on port " + serverPort);
+
+            // Ascolta e accetta connessioni in arrivo
             while (!done) {
-                Socket client = server.accept(); // Accetta nuove connessioni
+                Socket client = server.accept(); // Accetta la connessione sicura
                 Client clientInfo = new Client();
                 int inactivityTimeout = 20; // Timeout configurabile
 
@@ -56,9 +90,9 @@ public class Server implements Runnable {
                 connections.add(handler); // Aggiungi alla lista delle connessioni
                 executor.execute(handler); // Esegui il gestore in un thread separato
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             if (!done) {
-                System.err.println("Error starting server: " + e.getMessage());
+                System.err.println("Error starting SSL server: " + e.getMessage());
             }
             shutdown();
         }
