@@ -19,5 +19,5 @@ Informazioni bonus: Il Certificato è autofirmato con validità di 3650 giorni.
 3. Per Esportare la keystore in crt per poter configurare il client:
    keytool -export -alias mykey -file server.crt -keystore server.keystore -storetype PKCS12
 
-4. Ora che hai creato Il certificato del server, devi farlo approvare al client attraverso un truststore:
+4. Ora che hai creato Il certificato del server, devi farlo approvare al client attraverso un truststore poiché esso non è ufficiale, ovvero è autofirmato e lo dobbiamo aggiungere manualmente nello score. Sennò dobbiamo usare CertBort per creare uno ufficiale e il trsutmanager lo troverà senza nemmeno aggiungerlo privatamente:
    keytool -import -alias server -file server.crt -keystore client.truststore -storetype PKCS12
