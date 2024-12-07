@@ -6,6 +6,8 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -99,6 +101,7 @@ public class Server implements Runnable {
     }
 
     private class ConnectionHandler implements Runnable {
+
         private final Socket client;
         private final BufferedReader in;
         private final PrintWriter out;
@@ -141,7 +144,6 @@ public class Server implements Runnable {
                 while ((message = in.readLine()) != null) {
                     timeoutFuture.cancel(false);
                     timeoutFuture = scheduler.schedule(timeoutTask, inactivityTimeout, TimeUnit.SECONDS);
-
                     if (!clientInfo.isAuthenticated()) {
                         if (message.startsWith("/login ")) {
                             handleLogin(message);
@@ -151,12 +153,18 @@ public class Server implements Runnable {
                             out.println("You must login/register first.");
                         }
                     } else {
+                        // Dopo il login, accetta i comandi senza il prefisso /login
                         if (message.equals("/disconnect")) {
                             handleDisconnect();
+                        } else if (message.startsWith("/change_password ")) {
+                            handleChangePassword(message);
+                        } else if (message.startsWith("/change_name ")) {
+                            handleChangeName(message);
                         } else {
                             broadcast(clientInfo.getNickname() + ": " + message, this);
                         }
                     }
+
                 }
             } catch (IOException e) {
                 System.err.println("Connection error with client: " + e.getMessage());
@@ -197,6 +205,88 @@ public class Server implements Runnable {
                 out.println("/register_success");
             } else {
                 out.println("Registration failed.");
+            }
+        }
+
+        private void handleChangePassword(String message) {
+            String[] parts = message.split("\\s+", 2);
+            if (parts.length != 2) {
+                out.println("/error Formato errato. Usa: /change_password <nuova_password>");
+                return;
+            }
+
+            String newPassword = parts[1];
+
+            // Hash della nuova password con SHA-256
+            String hashedPassword = hashPassword(newPassword);
+
+            String sql = "UPDATE Account SET Password = ? WHERE Nickname = ?";
+
+            try (Connection conn = Database.getInstance().getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, hashedPassword); // Salviamo la password hashed nel DB
+                stmt.setString(2, clientInfo.getNickname());
+                stmt.executeUpdate();
+                out.println("Password aggiornata con successo.");
+            } catch (SQLException e) {
+                e.printStackTrace();
+                out.println("/error Errore durante l'aggiornamento della password.");
+            }
+        }
+
+        private String hashPassword(String password) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hashedBytes = digest.digest(password.getBytes());
+                // Converti il byte array in una stringa esadecimale
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : hashedBytes) {
+                    hexString.append(String.format("%02x", b));
+                }
+                return hexString.toString();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
+        private void handleChangeName(String message) {
+            String[] parts = message.split("\\s+", 2);
+            if (parts.length != 2) {
+                out.println("/error Formato errato. Usa: /change_name <nuovo_nome>");
+                return;
+            }
+
+            String newName = parts[1];
+            String checkSql = "SELECT COUNT(*) FROM Account WHERE Nickname = ?";
+
+            try (Connection conn = Database.getInstance().getConnection();
+                    PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                checkStmt.setString(1, newName);
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next() && rs.getInt(1) > 0) {
+                    out.println("/error Nome già in uso. Scegli un altro nome.");
+                    return;
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                out.println("/error Errore durante il controllo del nome.");
+                return;
+            }
+
+            String updateSql = "UPDATE Account SET Nickname = ? WHERE Nickname = ?";
+
+            try (Connection conn = Database.getInstance().getConnection();
+                    PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                updateStmt.setString(1, newName);
+                updateStmt.setString(2, clientInfo.getNickname());
+                updateStmt.executeUpdate();
+                clientInfo.setNickname(newName);
+                out.println("Nome aggiornato con successo.");
+                updateUsersList();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                out.println("/error Errore durante l'aggiornamento del nome.");
             }
         }
 
