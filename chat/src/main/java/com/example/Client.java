@@ -145,9 +145,8 @@ public class Client implements Runnable {
     }
 
     // Metodo per mostrare un messaggio di errore tramite gui
-    // Metodo per mostrare un messaggio di errore tramite gui
     private void showError(String message) {
-        // Creazione di un JOptionPane personalizzato con un pulsante "Chiudi"
+        // Crea una finestra di dialogo separata per gli errori di password
         JOptionPane optionPane = new JOptionPane(
                 message,
                 JOptionPane.ERROR_MESSAGE,
@@ -156,20 +155,10 @@ public class Client implements Runnable {
                 new Object[] { "Chiudi" }, // Aggiungi il pulsante "Chiudi"
                 null);
 
-        // Crea una finestra di dialogo con il JOptionPane personalizzato
-        JDialog dialog = optionPane.createDialog(gui, "Errore");
-
-        // Aggiungi un listener per la chiusura
+        // Crea un JDialog separato per l'errore di password
+        JDialog dialog = optionPane.createDialog(gui, "Errore Cambio Password");
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         dialog.setVisible(true);
-
-        // Dopo che l'utente ha cliccato "Chiudi", mostra la finestra di login
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                loginFrame.clearPasswordField(); // Metodo per svuotare il campo password
-                loginFrame.setVisible(true); // Mostra la finestra di login
-            }
-        });
     }
 
     // Getter per l'autenticazione

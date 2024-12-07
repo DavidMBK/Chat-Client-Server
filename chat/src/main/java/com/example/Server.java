@@ -212,25 +212,31 @@ public class Server implements Runnable {
             String[] parts = message.split("\\s+", 2);
             if (parts.length != 2) {
                 out.println("/error Formato errato. Usa: /change_password <nuova_password>");
-                return;
-            }
+            } else {
+                String newPassword = parts[1];
 
-            String newPassword = parts[1];
+                // Controllo della password con il pattern
+                String passwordPattern = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*(),.?\":{}|<>])[A-Za-z\\d!@#$%^&*(),.?\":{}|<>]{8,}$";
+                if (!newPassword.matches(passwordPattern)) {
+                    out.println(
+                            "/error La password deve contenere almeno una lettera maiuscola, una lettera minuscola, un numero e un carattere speciale.");
+                } else {
+                    // Hash della nuova password con SHA-256
+                    String hashedPassword = hashPassword(newPassword);
 
-            // Hash della nuova password con SHA-256
-            String hashedPassword = hashPassword(newPassword);
+                    String sql = "UPDATE Account SET Password = ? WHERE Nickname = ?";
 
-            String sql = "UPDATE Account SET Password = ? WHERE Nickname = ?";
-
-            try (Connection conn = Database.getInstance().getConnection();
-                    PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.setString(1, hashedPassword); // Salviamo la password hashed nel DB
-                stmt.setString(2, clientInfo.getNickname());
-                stmt.executeUpdate();
-                out.println("Password aggiornata con successo.");
-            } catch (SQLException e) {
-                e.printStackTrace();
-                out.println("/error Errore durante l'aggiornamento della password.");
+                    try (Connection conn = Database.getInstance().getConnection();
+                            PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, hashedPassword); // Salviamo la password hashed nel DB
+                        stmt.setString(2, clientInfo.getNickname());
+                        stmt.executeUpdate();
+                        out.println("Password aggiornata con successo.");
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        out.println("Errore durante l'aggiornamento della password.");
+                    }
+                }
             }
         }
 
