@@ -6,6 +6,8 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -214,17 +216,37 @@ public class Server implements Runnable {
             }
 
             String newPassword = parts[1];
+
+            // Hash della nuova password con SHA-256
+            String hashedPassword = hashPassword(newPassword);
+
             String sql = "UPDATE Account SET Password = ? WHERE Nickname = ?";
 
             try (Connection conn = Database.getInstance().getConnection();
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.setString(1, newPassword);
+                stmt.setString(1, hashedPassword); // Salviamo la password hashed nel DB
                 stmt.setString(2, clientInfo.getNickname());
                 stmt.executeUpdate();
                 out.println("Password aggiornata con successo.");
             } catch (SQLException e) {
                 e.printStackTrace();
                 out.println("/error Errore durante l'aggiornamento della password.");
+            }
+        }
+
+        private String hashPassword(String password) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hashedBytes = digest.digest(password.getBytes());
+                // Converti il byte array in una stringa esadecimale
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : hashedBytes) {
+                    hexString.append(String.format("%02x", b));
+                }
+                return hexString.toString();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+                return null;
             }
         }
 
