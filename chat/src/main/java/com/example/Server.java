@@ -1,5 +1,6 @@
 package com.example;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -38,6 +39,7 @@ public class Server implements Runnable {
     private ServerSocket server; // Socket server
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
+    private final ConcurrentHashMap<String, Integer> ipConnections = new ConcurrentHashMap<>();
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -81,19 +83,34 @@ public class Server implements Runnable {
             // Ascolta e accetta connessioni in arrivo
             while (!done) {
                 Socket client = server.accept(); // Accetta la connessione sicura
-                Client clientInfo = new Client();
-                int inactivityTimeout = config.getTimeout(); // Timeout configurabile
+                String clientIp = client.getInetAddress().getHostAddress();
 
-                // Crea un gestore per il client
-                ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);
-                connections.add(handler); // Aggiungi alla lista delle connessioni
-                executor.execute(handler); // Esegui il gestore in un thread separato
+                // Controlla il numero di connessioni per l'indirizzo IP del client
+                ipConnections.putIfAbsent(clientIp, 0);
+                int currentConnections = ipConnections.get(clientIp);
+
+                if (currentConnections >= 2) {
+                    // Se ci sono già due connessioni da questo IP, invia un messaggio di errore e
+                    // chiudi la connessione
+                    PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+                    out.println("/Errore troppi account connessi da questo indirizzo IP.");
+                    out.flush();
+                    client.close();
+                    System.out.println("Connessione rifiutata per l'indirizzo IP: " + clientIp);
+                } else {
+                    // Incrementa il conteggio delle connessioni per questo IP
+                    ipConnections.put(clientIp, currentConnections + 1);
+
+                    Client clientInfo = new Client();
+                    int inactivityTimeout = config.getTimeout(); // Timeout configurabile
+
+                    // Crea un gestore per il client
+                    ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);
+                    connections.add(handler); // Aggiungi alla lista delle connessioni
+                    executor.execute(handler); // Esegui il gestore in un thread separato
+                }
             }
         } catch (Exception e) {
-            if (!done) {
-                System.err.println("Error starting SSL server: " + e.getMessage());
-            }
-            shutdown();
         }
     }
 
@@ -115,22 +132,6 @@ public class Server implements Runnable {
 
         String usersList = "/users_list " + String.join(",", uniqueUsernames);
         broadcast(usersList, null); // broadcast a tutti gli utenti, quindi il sender è null
-    }
-
-    public void shutdown() {
-        done = true;
-        try {
-            if (server != null && !server.isClosed()) {
-                server.close();
-            }
-            executor.shutdown();
-            for (ConnectionHandler ch : connections) {
-                ch.shutdown();
-            }
-            System.out.println("Server shut down.");
-        } catch (IOException e) {
-            System.err.println("Error shutting down server: " + e.getMessage());
-        }
     }
 
     private class ConnectionHandler implements Runnable {
@@ -379,17 +380,29 @@ public class Server implements Runnable {
         public void sendMessage(String message) {
             out.println(message);
         }
-
+        
         public void shutdown() {
             try {
+                String clientIp = client.getInetAddress().getHostAddress();
+                // Decrementa il conteggio delle connessioni per questo IP
+                ipConnections.put(clientIp, ipConnections.get(clientIp) - 1);
+        
+                // Se la connessione è ancora aperta, invia il messaggio
                 if (!client.isClosed()) {
                     if (clientInfo.isAuthenticated()) {
                         out.println("Sessione scaduta. Riaccedere.");
+                        out.flush();  // Forza il flush per inviare il messaggio prima di chiudere la connessione
                     }
-                    client.close();
+                    client.close();  // Chiudi la connessione dopo aver inviato il messaggio
                 }
+                
+                // Rimuovi il gestore dalla lista delle connessioni
                 connections.remove(this);
+                
+                // Ferma il task di timeout
                 scheduler.shutdown();
+                
+                // Aggiorna la lista degli utenti online
                 updateUsersList();
             } catch (IOException e) {
                 e.printStackTrace();
