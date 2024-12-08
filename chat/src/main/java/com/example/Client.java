@@ -134,6 +134,7 @@ public class Client implements Runnable {
             // Gestione sessione scaduta
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
+                    loginFrame.clearPasswordField();
                     gui.setVisible(false); // Nasconde la finestra di chat
                     showError("Sessione scaduta. Riaccedere.");
                 }
