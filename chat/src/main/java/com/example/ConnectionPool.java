@@ -13,9 +13,9 @@ public class ConnectionPool {
     private Vector<Connection> connections; // Vettore per memorizzare le connessioni disponibili nel pool.
 
     /*
-     * Vector è un oggetto Legacy di java safe-thread ovvero non causa problemi di
-     * sincronizzazzione dei thread, ovvero possiamo
-     * aggiungere e rimuovere connessioni in modo sicuro anche se molte parti del
+     * Vector è un oggetto Legacy di Java, sicuro per l'uso in ambienti multithread,
+     * ovvero non causa problemi di sincronizzazione dei thread, quindi possiamo
+     * aggiungere e rimuovere connessioni in modo sicuro anche se più parti del
      * codice cercano di farlo contemporaneamente.
      * 
      */
@@ -36,11 +36,11 @@ public class ConnectionPool {
     public synchronized Connection getConnection() throws SQLException {
         Connection conn = null;
         if (connections.size() > 0) {
-            conn = connections.remove(0);
+            conn = connections.remove(0); // Se ci sono connessioni disponibili nel pool, ne rimuove una.
         } else {
             String url = Config.getInstance().getDbUrl(); // Ottiene l'URL del database dalla configurazione.
             String username = Config.getInstance().getDbUsername(); // Ottiene il nome del DB.
-            String password = Config.getInstance().getDbPassword(); // Ottiene la password per connettersi al db
+            String password = Config.getInstance().getDbPassword(); // Ottiene la password per connettersi al db.
             // Crea una nuova connessione utilizzando DriverManager.
             conn = DriverManager.getConnection(url, username, password);
         }

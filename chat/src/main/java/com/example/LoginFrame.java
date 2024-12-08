@@ -65,7 +65,7 @@ public class LoginFrame extends JFrame {
                 String nickname = usernameField.getText().trim();
                 String password = new String(passwordField.getPassword());
                 if (password.isEmpty()) {
-                    showError("Password cannot be empty!");
+                    showError("La password non può essere vuota!");
                 } else {
                     String hashedPassword = Client.hashPassword(password);
                     client.sendMessage("/login " + nickname + " " + hashedPassword);
@@ -88,13 +88,13 @@ public class LoginFrame extends JFrame {
 
                 // Controllo che la password non sia vuota
                 if (password.isEmpty()) {
-                    showError("Password cannot be empty!");
+                    showError("La password non può essere vuota!");
                     return;
                 }
 
                 // Controllo sulla lunghezza della password
                 if (password.length() < 8) {
-                    showError("Password must be at least 8 characters long.");
+                    showError("La password deve essere lunga almeno 8 caratteri.");
                     return;
                 }
 
@@ -103,7 +103,7 @@ public class LoginFrame extends JFrame {
                 String passwordPattern = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*(),.?\":{}|<>])[A-Za-z\\d!@#$%^&*(),.?\":{}|<>]{8,}$";
                 if (!password.matches(passwordPattern)) {
                     showError(
-                            "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.");
+                            "La password deve contenere almeno una lettera maiuscola, una lettera minuscola, un numero e un carattere speciale.");
                     return;
                 }
 

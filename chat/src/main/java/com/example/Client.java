@@ -40,18 +40,18 @@ public class Client implements Runnable {
     }
 
     public void run() {
-        connectToServer();
+        connectToServer(); // Avvia la connessione al server
     }
 
     // Metodo per connettersi al server tramite SSL
     private void connectToServer() {
         try {
-            // Load configuration from config file
+            // Carica la configurazione dal file di configurazione
             Config config = Config.getInstance();
             String serverIp = config.getServerIp();
             int serverPort = config.getServerPort();
 
-            // Load the client truststore containing trusted certificates
+            // Carica il truststore del client contenente i certificati fidati
             char[] trustStorePassword = config.getSSLPassword().toCharArray();
 
             KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
@@ -59,39 +59,39 @@ public class Client implements Runnable {
                 trustStore.load(trustStoreFile, trustStorePassword);
             }
 
-            // Create a TrustManagerFactory with the loaded truststore
+            // Crea un TrustManagerFactory con il truststore caricato
             TrustManagerFactory trustManagerFactory = TrustManagerFactory
                     .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
-            // Configure SSLContext with the TrustManager from the truststore
+            // Configura l'SSLContext con il TrustManager dal truststore
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, trustManagerFactory.getTrustManagers(), new java.security.SecureRandom());
 
-            // Get the SSLSocketFactory and create a secure connection
+            // Ottieni la SSLSocketFactory e crea una connessione sicura
             SSLSocketFactory socketFactory = sslContext.getSocketFactory();
             client = (SSLSocket) socketFactory.createSocket(serverIp, serverPort);
 
-            // Initialize streams
+            // Inizializza gli stream
             out = new PrintWriter(client.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(client.getInputStream()));
 
-            // Show the login window
+            // Mostra la finestra di login
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
                     loginFrame.setVisible(true);
                 }
             });
 
-            // Read messages from the server
+            // Leggi i messaggi dal server
             String inMessage;
             while ((inMessage = in.readLine()) != null) {
-                processMessage(inMessage);
+                processMessage(inMessage); // Processa il messaggio ricevuto
             }
 
         } catch (Exception e) {
-            showError("Error connecting to the server.");
-            shutdown(); // Close resources
+            showError("Errore nella connessione al server."); // Mostra errore di connessione
+            shutdown(); // Chiude le risorse
         }
     }
 
@@ -103,20 +103,20 @@ public class Client implements Runnable {
                 public void run() {
                     loginFrame.setVisible(false); // Nasconde la finestra di login
                     gui.setVisible(true); // Mostra la finestra principale del client
-                    gui.appendMessage("Benvenuto su Zuusmee, " + getNickname() + "!", false);
+                    gui.appendMessage("Benvenuto su Zuusmee, " + getNickname() + "!", false); // Messaggio di benvenuto
                 }
             });
         } else if (message.startsWith("/register_success")) {
             // Simula il click del pulsante login dopo la registrazione
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
-                    loginFrame.simulateLogin();
+                    loginFrame.simulateLogin(); // Simula login
                 }
             });
         } else if (message.startsWith("/error")) {
             // Gestisce i messaggi di errore per login o registrazione
             String errorMessage = message.replace("/error ", "");
-            showError(errorMessage);
+            showError(errorMessage); // Mostra l'errore
 
             // Aggiungi qui la gestione per chiudere la GUI e il processo
             if (errorMessage.contains("troppi account connessi da questo indirizzo IP")) {
@@ -149,7 +149,7 @@ public class Client implements Runnable {
 
     // Metodo per processare la lista degli utenti
     private void processUsersList(String message) {
-        String[] users = message.replace("/users_list ", "").split(","); // Splitta il messaggio per trovare l'user
+        String[] users = message.replace("/users_list ", "").split(","); // Splitta il messaggio per trovare gli utenti
         Set<String> uniqueUsers = new HashSet<>(Arrays.asList(users)); // Usa un set per rimuovere duplicati
         gui.updateUsersList(uniqueUsers.toArray(new String[0])); // Aggiorna la lista degli utenti nella GUI
     }
@@ -175,22 +175,22 @@ public class Client implements Runnable {
     // Metodo per inviare un messaggio al server
     public void sendMessage(String messageText) {
         if (out != null) {
-            out.println(messageText);
+            out.println(messageText); // Invia il messaggio al server
         }
     }
 
-    // Metodo per mostrare un messaggio di errore tramite gui
+    // Metodo per mostrare un messaggio di errore tramite la GUI
     private void showError(String message) {
-        // Crea una finestra di dialogo separata per gli errori di password
+        // Crea una finestra di dialogo separata per gli errori
         JOptionPane optionPane = new JOptionPane(
                 message,
                 JOptionPane.ERROR_MESSAGE,
                 JOptionPane.DEFAULT_OPTION,
                 null,
-                new Object[]{"Chiudi"}, // Aggiungi il pulsante "Chiudi"
+                new Object[] { "Chiudi" }, // Aggiungi il pulsante "Chiudi"
                 null);
 
-        // Crea un JDialog separato per l'errore di password
+        // Crea un JDialog separato per l'errore
         JDialog dialog = optionPane.createDialog(gui, "Errore Cambio Password");
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         dialog.setVisible(true);

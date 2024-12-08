@@ -47,7 +47,6 @@ public class Server implements Runnable {
     private Map<String, Integer> loginAttempts = new HashMap<>();
     private Map<String, Long> blockTime = new HashMap<>();
 
-
     public Server() {
         connections = new CopyOnWriteArrayList<>();
         done = false;
@@ -191,7 +190,7 @@ public class Server implements Runnable {
                         } else if (message.startsWith("/register ")) {
                             handleRegister(message);
                         } else {
-                            out.println("You must login/register first.");
+                            out.println("Devi prima loggare/registrarti.");
                         }
                     } else {
                         // Dopo il login, accetta i comandi senza il prefisso /login
@@ -208,35 +207,35 @@ public class Server implements Runnable {
 
                 }
             } catch (IOException e) {
-                System.err.println("Connection error with client: " + e.getMessage());
+                System.err.println("Errore di connessione con il client: " + e.getMessage());
             } finally {
                 shutdown();
             }
         }
 
-       
-        
         private synchronized void handleLogin(String message) {
             String[] parts = message.split("\\s+", 3);
             if (parts.length != 3) {
-                out.println("Invalid login format. Use: /login <Nickname> <Password>");
+                out.println("Formato di login non valido. Utilizzare: /login <Nickname> <Password>");
                 return;
             }
             String nickname = parts[1];
             String password = parts[2];
-        
+
             // Verifica se l'utente è bloccato
-            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) < BLOCK_TIME) {
+            if (blockTime.containsKey(nickname)
+                    && (System.currentTimeMillis() - blockTime.get(nickname)) < BLOCK_TIME) {
                 out.println("/error Account bloccato per tentativi falliti. Riprova dopo 15 secondi.");
                 return;
             }
-        
+
             // Resetta il contatore se è passato il tempo di blocco
-            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) >= BLOCK_TIME) {
+            if (blockTime.containsKey(nickname)
+                    && (System.currentTimeMillis() - blockTime.get(nickname)) >= BLOCK_TIME) {
                 loginAttempts.remove(nickname);
                 blockTime.remove(nickname);
             }
-        
+
             if (validateLogin(nickname, password)) {
                 clientInfo.setAuthenticated(true);
                 clientInfo.setNickname(nickname);
@@ -247,14 +246,13 @@ public class Server implements Runnable {
             } else {
                 loginAttempts.put(nickname, loginAttempts.getOrDefault(nickname, 0) + 1);
                 out.println("/error Nome utente o password errati.");
-        
+
                 if (loginAttempts.get(nickname) >= MAX_ATTEMPTS) {
                     blockTime.put(nickname, System.currentTimeMillis());
                     out.println("/error Account bloccato per troppi tentativi falliti. Riprova dopo 15 secondi.");
                 }
             }
         }
-        
 
         private synchronized void handleRegister(String message) {
             String[] parts = message.split("\\s+", 3);
@@ -410,28 +408,28 @@ public class Server implements Runnable {
         public void sendMessage(String message) {
             out.println(message);
         }
-        
+
         public void shutdown() {
             try {
                 String clientIp = client.getInetAddress().getHostAddress();
                 // Decrementa il conteggio delle connessioni per questo IP
                 ipConnections.put(clientIp, ipConnections.get(clientIp) - 1);
-        
+
                 // Se la connessione è ancora aperta, invia il messaggio
                 if (!client.isClosed()) {
                     if (clientInfo.isAuthenticated()) {
                         out.println("Sessione scaduta. Riaccedere.");
-                        out.flush();  // Forza il flush per inviare il messaggio prima di chiudere la connessione
+                        out.flush(); // Forza il flush per inviare il messaggio prima di chiudere la connessione
                     }
-                    client.close();  // Chiudi la connessione dopo aver inviato il messaggio
+                    client.close(); // Chiudi la connessione dopo aver inviato il messaggio
                 }
-                
+
                 // Rimuovi il gestore dalla lista delle connessioni
                 connections.remove(this);
-                
+
                 // Ferma il task di timeout
                 scheduler.shutdown();
-                
+
                 // Aggiorna la lista degli utenti online
                 updateUsersList();
             } catch (IOException e) {

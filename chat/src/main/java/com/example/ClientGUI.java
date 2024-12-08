@@ -15,7 +15,7 @@ public class ClientGUI extends JFrame {
 
     public ClientGUI(final Client client) {
         this.client = client;
-        setTitle("Zuusmee - Telegram Style");
+        setTitle("Zuusmee");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -40,9 +40,8 @@ public class ClientGUI extends JFrame {
         input.setBackground(new Color(255, 255, 255));
         input.setForeground(Color.BLACK);
         input.setBorder(BorderFactory.createCompoundBorder(
-            input.getBorder(),
-            BorderFactory.createEmptyBorder(5, 5, 5, 5)
-        ));
+                input.getBorder(),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)));
         input.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -86,7 +85,8 @@ public class ClientGUI extends JFrame {
         userListPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
         userListPanel.setPreferredSize(new Dimension(200, 0));
 
-        // Aggiunta dei pulsanti "Modifica Password" e "Modifica Nome" sotto l'elenco degli utenti
+        // Aggiunta dei pulsanti "Modifica Password" e "Modifica Nome" sotto l'elenco
+        // degli utenti
         JButton changePasswordButton = new JButton("Modifica Password");
         changePasswordButton.setFont(new Font("Arial", Font.BOLD, 14));
         changePasswordButton.setBackground(new Color(0, 132, 255));
@@ -137,6 +137,7 @@ public class ClientGUI extends JFrame {
         });
     }
 
+    // Metodo per inviare un messaggio
     private void sendMessage() {
         String message = input.getText().trim();
         if (!message.isEmpty()) {
@@ -146,54 +147,53 @@ public class ClientGUI extends JFrame {
         }
     }
 
+    // Metodo per cambiare la password
     private void changePassword() {
         JPasswordField passwordField = new JPasswordField();
         Object[] message = {
-            "Inserisci la nuova password:", passwordField
+                "Inserisci la nuova password:", passwordField
         };
         int option = JOptionPane.showConfirmDialog(
-            this,
-            message,
-            "Modifica Password",
-            JOptionPane.OK_CANCEL_OPTION,
-            JOptionPane.PLAIN_MESSAGE
-        );
-    
+                this,
+                message,
+                "Modifica Password",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+
         if (option == JOptionPane.OK_OPTION) {
             String newPassword = new String(passwordField.getPassword()).trim();
             if (!newPassword.isEmpty()) {
                 client.sendMessage("/change_password " + newPassword);
             } else {
                 JOptionPane.showMessageDialog(
-                    this,
-                    "La password non può essere vuota.",
-                    "Errore",
-                    JOptionPane.ERROR_MESSAGE
-                );
+                        this,
+                        "La password non può essere vuota.",
+                        "Errore",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
-    
+
+    // Metodo per cambiare il nome
     private void changeName() {
         String newName = JOptionPane.showInputDialog(
-            this,
-            "Inserisci il nuovo nome:",
-            "Modifica Nome",
-            JOptionPane.PLAIN_MESSAGE
-        );
+                this,
+                "Inserisci il nuovo nome:",
+                "Modifica Nome",
+                JOptionPane.PLAIN_MESSAGE);
 
         if (newName != null && !newName.trim().isEmpty()) {
             client.sendMessage("/change_name " + newName.trim());
         } else {
             JOptionPane.showMessageDialog(
-                this,
-                "Il nome non può essere vuoto.",
-                "Errore",
-                JOptionPane.ERROR_MESSAGE
-            );
+                    this,
+                    "Il nome non può essere vuoto.",
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
+    // Metodo per aggiungere un messaggio alla chat
     public void appendMessage(String message, boolean sentByUser) {
         MessageBubble bubble = new MessageBubble(message, sentByUser);
         chatPanel.add(bubble);
@@ -201,6 +201,7 @@ public class ClientGUI extends JFrame {
         chatScrollPane.getVerticalScrollBar().setValue(chatScrollPane.getVerticalScrollBar().getMaximum());
     }
 
+    // Metodo per aggiornare l'elenco degli utenti
     public void updateUsersList(final String[] users) {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
@@ -213,6 +214,7 @@ public class ClientGUI extends JFrame {
         });
     }
 
+    // Metodo per rimuovere le istruzioni dalla chat
     public void removeInstructions() {
         chatPanel.removeAll();
         chatPanel.revalidate();
