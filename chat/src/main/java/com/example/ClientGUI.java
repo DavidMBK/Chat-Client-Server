@@ -147,25 +147,33 @@ public class ClientGUI extends JFrame {
     }
 
     private void changePassword() {
-        String newPassword = JOptionPane.showInputDialog(
+        JPasswordField passwordField = new JPasswordField();
+        Object[] message = {
+            "Inserisci la nuova password:", passwordField
+        };
+        int option = JOptionPane.showConfirmDialog(
             this,
-            "Inserisci la nuova password:",
+            message,
             "Modifica Password",
+            JOptionPane.OK_CANCEL_OPTION,
             JOptionPane.PLAIN_MESSAGE
         );
-
-        if (newPassword != null && !newPassword.trim().isEmpty()) {
-            client.sendMessage("/change_password " + newPassword.trim());
-        } else {
-            JOptionPane.showMessageDialog(
-                this,
-                "La password non può essere vuota.",
-                "Errore",
-                JOptionPane.ERROR_MESSAGE
-            );
+    
+        if (option == JOptionPane.OK_OPTION) {
+            String newPassword = new String(passwordField.getPassword()).trim();
+            if (!newPassword.isEmpty()) {
+                client.sendMessage("/change_password " + newPassword);
+            } else {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "La password non può essere vuota.",
+                    "Errore",
+                    JOptionPane.ERROR_MESSAGE
+                );
+            }
         }
     }
-
+    
     private void changeName() {
         String newName = JOptionPane.showInputDialog(
             this,
