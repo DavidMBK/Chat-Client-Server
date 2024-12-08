@@ -1,6 +1,5 @@
 package com.example;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -17,6 +16,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -93,7 +93,7 @@ public class Server implements Runnable {
                     // Se ci sono già due connessioni da questo IP, invia un messaggio di errore e
                     // chiudi la connessione
                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-                    out.println("/Errore troppi account connessi da questo indirizzo IP.");
+                    out.println("/error troppi account connessi da questo indirizzo IP.");
                     out.flush();
                     client.close();
                     System.out.println("Connessione rifiutata per l'indirizzo IP: " + clientIp);
