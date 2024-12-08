@@ -42,8 +42,8 @@ public class Server implements Runnable {
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
     private final ConcurrentHashMap<String, Integer> ipConnections = new ConcurrentHashMap<>();
-    private static final int MAX_ATTEMPTS = 10;
-    private static final long BLOCK_TIME = 15000;
+    private static final int MAX_ATTEMPTS = Config.getInstance().getMaxAttempts();
+    private static final long BLOCK_TIME = Config.getInstance().getBlockTime();
     private Map<String, Integer> loginAttempts = new HashMap<>();
     private Map<String, Long> blockTime = new HashMap<>();
 
