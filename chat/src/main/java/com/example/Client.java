@@ -117,6 +117,17 @@ public class Client implements Runnable {
             // Gestisce i messaggi di errore per login o registrazione
             String errorMessage = message.replace("/error ", "");
             showError(errorMessage);
+
+            // Aggiungi qui la gestione per chiudere la GUI e il processo
+            if (errorMessage.contains("troppi account connessi da questo indirizzo IP")) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        gui.dispose(); // Chiude l'interfaccia grafica
+                    }
+                });
+                System.exit(0); // Termina il processo
+            }
+
         } else if (message.startsWith("/users_list")) {
             processUsersList(message); // Processa la lista degli utenti
         } else if (message.equals("Sessione scaduta. Riaccedere.")) {
@@ -175,7 +186,7 @@ public class Client implements Runnable {
                 JOptionPane.ERROR_MESSAGE,
                 JOptionPane.DEFAULT_OPTION,
                 null,
-                new Object[] { "Chiudi" }, // Aggiungi il pulsante "Chiudi"
+                new Object[]{"Chiudi"}, // Aggiungi il pulsante "Chiudi"
                 null);
 
         // Crea un JDialog separato per l'errore di password

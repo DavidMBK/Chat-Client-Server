@@ -14,8 +14,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,6 +41,12 @@ public class Server implements Runnable {
     private ServerSocket server; // Socket server
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
+    private final ConcurrentHashMap<String, Integer> ipConnections = new ConcurrentHashMap<>();
+    private static final int MAX_ATTEMPTS = Config.getInstance().getMaxAttempts();
+    private static final long BLOCK_TIME = Config.getInstance().getBlockTime();
+    private Map<String, Integer> loginAttempts = new HashMap<>();
+    private Map<String, Long> blockTime = new HashMap<>();
+
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -81,19 +90,34 @@ public class Server implements Runnable {
             // Ascolta e accetta connessioni in arrivo
             while (!done) {
                 Socket client = server.accept(); // Accetta la connessione sicura
-                Client clientInfo = new Client();
-                int inactivityTimeout = config.getTimeout(); // Timeout configurabile
+                String clientIp = client.getInetAddress().getHostAddress();
 
-                // Crea un gestore per il client
-                ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);
-                connections.add(handler); // Aggiungi alla lista delle connessioni
-                executor.execute(handler); // Esegui il gestore in un thread separato
+                // Controlla il numero di connessioni per l'indirizzo IP del client
+                ipConnections.putIfAbsent(clientIp, 0);
+                int currentConnections = ipConnections.get(clientIp);
+
+                if (currentConnections >= 2) {
+                    // Se ci sono già due connessioni da questo IP, invia un messaggio di errore e
+                    // chiudi la connessione
+                    PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+                    out.println("/error troppi account connessi da questo indirizzo IP.");
+                    out.flush();
+                    client.close();
+                    System.out.println("Connessione rifiutata per l'indirizzo IP: " + clientIp);
+                } else {
+                    // Incrementa il conteggio delle connessioni per questo IP
+                    ipConnections.put(clientIp, currentConnections + 1);
+
+                    Client clientInfo = new Client();
+                    int inactivityTimeout = config.getTimeout(); // Timeout configurabile
+
+                    // Crea un gestore per il client
+                    ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);
+                    connections.add(handler); // Aggiungi alla lista delle connessioni
+                    executor.execute(handler); // Esegui il gestore in un thread separato
+                }
             }
         } catch (Exception e) {
-            if (!done) {
-                System.err.println("Error starting SSL server: " + e.getMessage());
-            }
-            shutdown();
         }
     }
 
@@ -115,22 +139,6 @@ public class Server implements Runnable {
 
         String usersList = "/users_list " + String.join(",", uniqueUsernames);
         broadcast(usersList, null); // broadcast a tutti gli utenti, quindi il sender è null
-    }
-
-    public void shutdown() {
-        done = true;
-        try {
-            if (server != null && !server.isClosed()) {
-                server.close();
-            }
-            executor.shutdown();
-            for (ConnectionHandler ch : connections) {
-                ch.shutdown();
-            }
-            System.out.println("Server shut down.");
-        } catch (IOException e) {
-            System.err.println("Error shutting down server: " + e.getMessage());
-        }
     }
 
     private class ConnectionHandler implements Runnable {
@@ -206,6 +214,8 @@ public class Server implements Runnable {
             }
         }
 
+       
+        
         private synchronized void handleLogin(String message) {
             String[] parts = message.split("\\s+", 3);
             if (parts.length != 3) {
@@ -214,16 +224,37 @@ public class Server implements Runnable {
             }
             String nickname = parts[1];
             String password = parts[2];
-
+        
+            // Verifica se l'utente è bloccato
+            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) < BLOCK_TIME) {
+                out.println("/error Account bloccato per tentativi falliti. Riprova dopo 15 secondi.");
+                return;
+            }
+        
+            // Resetta il contatore se è passato il tempo di blocco
+            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) >= BLOCK_TIME) {
+                loginAttempts.remove(nickname);
+                blockTime.remove(nickname);
+            }
+        
             if (validateLogin(nickname, password)) {
                 clientInfo.setAuthenticated(true);
                 clientInfo.setNickname(nickname);
                 out.println("/login_success");
                 updateUsersList();
+                loginAttempts.remove(nickname); // Rimuove il contatore dei tentativi falliti
+                blockTime.remove(nickname); // Rimuove il tempo di blocco
             } else {
+                loginAttempts.put(nickname, loginAttempts.getOrDefault(nickname, 0) + 1);
                 out.println("/error Nome utente o password errati.");
+        
+                if (loginAttempts.get(nickname) >= MAX_ATTEMPTS) {
+                    blockTime.put(nickname, System.currentTimeMillis());
+                    out.println("/error Account bloccato per troppi tentativi falliti. Riprova dopo 15 secondi.");
+                }
             }
         }
+        
 
         private synchronized void handleRegister(String message) {
             String[] parts = message.split("\\s+", 3);
@@ -379,17 +410,29 @@ public class Server implements Runnable {
         public void sendMessage(String message) {
             out.println(message);
         }
-
+        
         public void shutdown() {
             try {
+                String clientIp = client.getInetAddress().getHostAddress();
+                // Decrementa il conteggio delle connessioni per questo IP
+                ipConnections.put(clientIp, ipConnections.get(clientIp) - 1);
+        
+                // Se la connessione è ancora aperta, invia il messaggio
                 if (!client.isClosed()) {
                     if (clientInfo.isAuthenticated()) {
                         out.println("Sessione scaduta. Riaccedere.");
+                        out.flush();  // Forza il flush per inviare il messaggio prima di chiudere la connessione
                     }
-                    client.close();
+                    client.close();  // Chiudi la connessione dopo aver inviato il messaggio
                 }
+                
+                // Rimuovi il gestore dalla lista delle connessioni
                 connections.remove(this);
+                
+                // Ferma il task di timeout
                 scheduler.shutdown();
+                
+                // Aggiorna la lista degli utenti online
                 updateUsersList();
             } catch (IOException e) {
                 e.printStackTrace();
