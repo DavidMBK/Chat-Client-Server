@@ -1,32 +1,35 @@
 package com.example;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
-import java.net.Socket;
+import java.security.KeyStore;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
 import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-
 import com.example.config.Config;
 
 public class Client implements Runnable {
 
-    private Socket client; // Socket utilizzato per la connessione con il server
+    private SSLSocket client; // SSLSocket per la connessione sicura
     private BufferedReader in; // Stream per leggere i dati dal server
     private PrintWriter out; // Stream per inviare i dati al server
+    @SuppressWarnings("unused")
     private boolean done; // Flag per indicare se il client è in fase di chiusura
-    private ClientGUI gui; // Riferimento all'interfaccia grafica del client
+    private ClientGUI gui; // Interfaccia grafica del client
     private LoginFrame loginFrame; // Finestra di login
-    private boolean isAuthenticated; // Flag per indicare se l'utente è autenticato
+    private boolean isAuthenticated; // Flag per l'autenticazione
     private String nickname; // Nickname dell'utente
 
     public Client() {
@@ -40,35 +43,55 @@ public class Client implements Runnable {
         connectToServer();
     }
 
-    // Metodo per connettersi al server
+    // Metodo per connettersi al server tramite SSL
     private void connectToServer() {
         try {
-            // Carica la configurazione dal file di configurazione
+            // Load configuration from config file
             Config config = Config.getInstance();
             String serverIp = config.getServerIp();
             int serverPort = config.getServerPort();
 
-            // Connessione al server
-            client = new Socket(serverIp, serverPort);
+            // Load the client truststore containing trusted certificates
+            char[] trustStorePassword = config.getSSLPassword().toCharArray();
+
+            KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            try (FileInputStream trustStoreFile = new FileInputStream("SSL-TLS/client.truststore")) {
+                trustStore.load(trustStoreFile, trustStorePassword);
+            }
+
+            // Create a TrustManagerFactory with the loaded truststore
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
+
+            // Configure SSLContext with the TrustManager from the truststore
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), new java.security.SecureRandom());
+
+            // Get the SSLSocketFactory and create a secure connection
+            SSLSocketFactory socketFactory = sslContext.getSocketFactory();
+            client = (SSLSocket) socketFactory.createSocket(serverIp, serverPort);
+
+            // Initialize streams
             out = new PrintWriter(client.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(client.getInputStream()));
 
-            // Mostra la finestra di login
+            // Show the login window
             SwingUtilities.invokeLater(new Runnable() {
                 public void run() {
                     loginFrame.setVisible(true);
                 }
             });
 
-            // Legge i messaggi dal server
+            // Read messages from the server
             String inMessage;
             while ((inMessage = in.readLine()) != null) {
                 processMessage(inMessage);
             }
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             showError("Error connecting to the server.");
-            shutdown(); // Chiude le risorse
+            shutdown(); // Close resources
         }
     }
 
@@ -94,6 +117,17 @@ public class Client implements Runnable {
             // Gestisce i messaggi di errore per login o registrazione
             String errorMessage = message.replace("/error ", "");
             showError(errorMessage);
+
+            // Aggiungi qui la gestione per chiudere la GUI e il processo
+            if (errorMessage.contains("troppi account connessi da questo indirizzo IP")) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        gui.dispose(); // Chiude l'interfaccia grafica
+                    }
+                });
+                System.exit(0); // Termina il processo
+            }
+
         } else if (message.startsWith("/users_list")) {
             processUsersList(message); // Processa la lista degli utenti
         } else if (message.equals("Sessione scaduta. Riaccedere.")) {
@@ -152,7 +186,7 @@ public class Client implements Runnable {
                 JOptionPane.ERROR_MESSAGE,
                 JOptionPane.DEFAULT_OPTION,
                 null,
-                new Object[] { "Chiudi" }, // Aggiungi il pulsante "Chiudi"
+                new Object[]{"Chiudi"}, // Aggiungi il pulsante "Chiudi"
                 null);
 
         // Crea un JDialog separato per l'errore di password
@@ -195,7 +229,7 @@ public class Client implements Runnable {
                 hexString.append(hex);
             }
             return hexString.toString();
-        } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -216,6 +250,6 @@ public class Client implements Runnable {
             }
         });
         Thread clientThread = new Thread(client); // Crea un thread per eseguire il client
-        clientThread.start(); // Avvia il thread del client
+        clientThread.start(); // Avvia il client
     }
 }

@@ -5,4 +5,8 @@
     <dbUrl>jdbc:mysql://localhost:3306/chat</dbUrl>
     <dbUsername>root</dbUsername>
     <dbPassword>lool</dbPassword>
+    <sslPassword>Prova1234!</sslPassword>
+    <timeout>20</timeout>
+    <maxAttempts>10</maxAttempts>
+    <blockTime>15000</blockTime> 
 </config>

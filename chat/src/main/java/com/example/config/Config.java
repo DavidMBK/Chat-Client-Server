@@ -1,8 +1,10 @@
 package com.example.config;
 
 import java.io.File;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.w3c.dom.Document;
 
 // Questa classe gestisce la configurazione del sistema basata su un file XML.
@@ -69,4 +71,25 @@ public class Config {
         // Ottiene il valore dell'elemento "dbPassword" dal documento XML.
         return doc.getElementsByTagName("dbPassword").item(0).getTextContent();
     }
+
+    // Metodo per ottenere la password SSL dalla configurazione.
+    public String getSSLPassword() {
+        return doc.getElementsByTagName("sslPassword").item(0).getTextContent();
+    }
+
+    // Metodo per ottenere il timeout dalla configurazione.
+    public int getTimeout() {
+        return Integer.parseInt(doc.getElementsByTagName("timeout").item(0).getTextContent());
+    }
+
+    // Metodo per ottenere il numero massimo di tentativi dalla configurazione.
+    public int getMaxAttempts() {
+        return Integer.parseInt(doc.getElementsByTagName("maxAttempts").item(0).getTextContent());
+    }
+
+    // Metodo per ottenere il tempo di blocco dalla configurazione.
+    public long getBlockTime() {
+        return Long.parseLong(doc.getElementsByTagName("blockTime").item(0).getTextContent());
+    }
+
 }

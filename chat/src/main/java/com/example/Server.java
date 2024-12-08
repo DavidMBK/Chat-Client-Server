@@ -1,19 +1,24 @@
 package com.example;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -21,6 +26,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 import com.example.config.Config;
 
@@ -30,6 +41,12 @@ public class Server implements Runnable {
     private ServerSocket server; // Socket server
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
+    private final ConcurrentHashMap<String, Integer> ipConnections = new ConcurrentHashMap<>();
+    private static final int MAX_ATTEMPTS = Config.getInstance().getMaxAttempts();
+    private static final long BLOCK_TIME = Config.getInstance().getBlockTime();
+    private Map<String, Integer> loginAttempts = new HashMap<>();
+    private Map<String, Long> blockTime = new HashMap<>();
+
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -40,27 +57,67 @@ public class Server implements Runnable {
     @Override
     public void run() {
         try {
+            // Ottieni la configurazione
             Config config = Config.getInstance();
-            int serverPort = config.getServerPort(); // Ottieni la porta dal file di configurazione
+            int serverPort = config.getServerPort(); // Porta del server dal file di configurazione
+            String sslpassword = config.getSSLPassword();
+            // Carica il keystore per SSL
+            char[] keystorePassword = sslpassword.toCharArray(); // Password del keystore
+            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            try (FileInputStream keystoreFile = new FileInputStream("SSL-TLS/server.keystore")) {
+                keystore.load(keystoreFile, keystorePassword);
+            }
 
-            server = new ServerSocket(serverPort);
-            System.out.println("Server started on port " + serverPort);
+            // Inizializza KeyManagerFactory con il keystore
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory
+                    .getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keystore, keystorePassword);
 
+            // Inizializza TrustManagerFactory con il keystore
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(keystore);
+
+            // Crea un contesto SSL
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
+
+            // Crea un server socket SSL
+            SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+            server = (SSLServerSocket) factory.createServerSocket(serverPort);
+            System.out.println("SSL server started on port " + serverPort);
+
+            // Ascolta e accetta connessioni in arrivo
             while (!done) {
-                Socket client = server.accept(); // Accetta nuove connessioni
-                Client clientInfo = new Client();
-                int inactivityTimeout = 20; // Timeout configurabile
+                Socket client = server.accept(); // Accetta la connessione sicura
+                String clientIp = client.getInetAddress().getHostAddress();
 
-                // Crea un gestore per il client
-                ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);
-                connections.add(handler); // Aggiungi alla lista delle connessioni
-                executor.execute(handler); // Esegui il gestore in un thread separato
+                // Controlla il numero di connessioni per l'indirizzo IP del client
+                ipConnections.putIfAbsent(clientIp, 0);
+                int currentConnections = ipConnections.get(clientIp);
+
+                if (currentConnections >= 2) {
+                    // Se ci sono già due connessioni da questo IP, invia un messaggio di errore e
+                    // chiudi la connessione
+                    PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+                    out.println("/error troppi account connessi da questo indirizzo IP.");
+                    out.flush();
+                    client.close();
+                    System.out.println("Connessione rifiutata per l'indirizzo IP: " + clientIp);
+                } else {
+                    // Incrementa il conteggio delle connessioni per questo IP
+                    ipConnections.put(clientIp, currentConnections + 1);
+
+                    Client clientInfo = new Client();
+                    int inactivityTimeout = config.getTimeout(); // Timeout configurabile
+
+                    // Crea un gestore per il client
+                    ConnectionHandler handler = new ConnectionHandler(client, clientInfo, inactivityTimeout);
+                    connections.add(handler); // Aggiungi alla lista delle connessioni
+                    executor.execute(handler); // Esegui il gestore in un thread separato
+                }
             }
-        } catch (IOException e) {
-            if (!done) {
-                System.err.println("Error starting server: " + e.getMessage());
-            }
-            shutdown();
+        } catch (Exception e) {
         }
     }
 
@@ -82,22 +139,6 @@ public class Server implements Runnable {
 
         String usersList = "/users_list " + String.join(",", uniqueUsernames);
         broadcast(usersList, null); // broadcast a tutti gli utenti, quindi il sender è null
-    }
-
-    public void shutdown() {
-        done = true;
-        try {
-            if (server != null && !server.isClosed()) {
-                server.close();
-            }
-            executor.shutdown();
-            for (ConnectionHandler ch : connections) {
-                ch.shutdown();
-            }
-            System.out.println("Server shut down.");
-        } catch (IOException e) {
-            System.err.println("Error shutting down server: " + e.getMessage());
-        }
     }
 
     private class ConnectionHandler implements Runnable {
@@ -173,6 +214,8 @@ public class Server implements Runnable {
             }
         }
 
+       
+        
         private synchronized void handleLogin(String message) {
             String[] parts = message.split("\\s+", 3);
             if (parts.length != 3) {
@@ -181,16 +224,37 @@ public class Server implements Runnable {
             }
             String nickname = parts[1];
             String password = parts[2];
-
+        
+            // Verifica se l'utente è bloccato
+            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) < BLOCK_TIME) {
+                out.println("/error Account bloccato per tentativi falliti. Riprova dopo 15 secondi.");
+                return;
+            }
+        
+            // Resetta il contatore se è passato il tempo di blocco
+            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) >= BLOCK_TIME) {
+                loginAttempts.remove(nickname);
+                blockTime.remove(nickname);
+            }
+        
             if (validateLogin(nickname, password)) {
                 clientInfo.setAuthenticated(true);
                 clientInfo.setNickname(nickname);
                 out.println("/login_success");
                 updateUsersList();
+                loginAttempts.remove(nickname); // Rimuove il contatore dei tentativi falliti
+                blockTime.remove(nickname); // Rimuove il tempo di blocco
             } else {
+                loginAttempts.put(nickname, loginAttempts.getOrDefault(nickname, 0) + 1);
                 out.println("/error Nome utente o password errati.");
+        
+                if (loginAttempts.get(nickname) >= MAX_ATTEMPTS) {
+                    blockTime.put(nickname, System.currentTimeMillis());
+                    out.println("/error Account bloccato per troppi tentativi falliti. Riprova dopo 15 secondi.");
+                }
             }
         }
+        
 
         private synchronized void handleRegister(String message) {
             String[] parts = message.split("\\s+", 3);
@@ -346,17 +410,29 @@ public class Server implements Runnable {
         public void sendMessage(String message) {
             out.println(message);
         }
-
+        
         public void shutdown() {
             try {
+                String clientIp = client.getInetAddress().getHostAddress();
+                // Decrementa il conteggio delle connessioni per questo IP
+                ipConnections.put(clientIp, ipConnections.get(clientIp) - 1);
+        
+                // Se la connessione è ancora aperta, invia il messaggio
                 if (!client.isClosed()) {
                     if (clientInfo.isAuthenticated()) {
                         out.println("Sessione scaduta. Riaccedere.");
+                        out.flush();  // Forza il flush per inviare il messaggio prima di chiudere la connessione
                     }
-                    client.close();
+                    client.close();  // Chiudi la connessione dopo aver inviato il messaggio
                 }
+                
+                // Rimuovi il gestore dalla lista delle connessioni
                 connections.remove(this);
+                
+                // Ferma il task di timeout
                 scheduler.shutdown();
+                
+                // Aggiorna la lista degli utenti online
                 updateUsersList();
             } catch (IOException e) {
                 e.printStackTrace();

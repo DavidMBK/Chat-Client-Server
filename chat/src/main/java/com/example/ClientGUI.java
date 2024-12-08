@@ -86,7 +86,7 @@ public class ClientGUI extends JFrame {
         userListPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
         userListPanel.setPreferredSize(new Dimension(200, 0));
 
-        // Aggiunta dei pulsanti "Modifica Password" e "Modifica Nome"
+        // Aggiunta dei pulsanti "Modifica Password" e "Modifica Nome" sotto l'elenco degli utenti
         JButton changePasswordButton = new JButton("Modifica Password");
         changePasswordButton.setFont(new Font("Arial", Font.BOLD, 14));
         changePasswordButton.setBackground(new Color(0, 132, 255));
@@ -120,12 +120,13 @@ public class ClientGUI extends JFrame {
         userOptionsPanel.add(Box.createRigidArea(new Dimension(0, 10))); // Spaziatura
         userOptionsPanel.add(changeNameButton);
 
+        userListPanel.add(userOptionsPanel, BorderLayout.SOUTH); // Posiziona i pulsanti sotto l'elenco degli utenti
+
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(titleLabel, BorderLayout.NORTH);
         getContentPane().add(chatScrollPane, BorderLayout.CENTER);
         getContentPane().add(bottom, BorderLayout.SOUTH);
         getContentPane().add(userListPanel, BorderLayout.EAST);
-        getContentPane().add(userOptionsPanel, BorderLayout.WEST);
 
         this.addWindowListener(new WindowAdapter() {
             @Override

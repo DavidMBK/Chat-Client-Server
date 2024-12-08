@@ -9,11 +9,12 @@ public class LoginFrame extends JFrame {
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JButton loginButton;
+    @SuppressWarnings("unused")
     private Client client;
 
     public LoginFrame(Client client) {
         this.client = client;
-        setTitle("Login / Register");
+        setTitle("Zuusmee");
         setSize(400, 300);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -22,21 +23,24 @@ public class LoginFrame extends JFrame {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
 
-        // Impostazioni di base per le Label e TextField
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-        JLabel titleLabel = new JLabel("Zuusmee Login/Register");
+        // Pannello per il titolo centrato
+        JPanel titlePanel = new JPanel(new BorderLayout());
+        JLabel titleLabel = new JLabel("Zuusmee", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
         titleLabel.setForeground(new Color(0, 122, 255));
+        titlePanel.add(titleLabel, BorderLayout.CENTER);
+
         gbc.gridwidth = 2;
         gbc.gridx = 0;
         gbc.gridy = 0;
-        panel.add(titleLabel, gbc);
+        panel.add(titlePanel, gbc);
 
+        // Impostazioni di base per le Label e TextField
         gbc.gridwidth = 1;
         gbc.gridx = 0;
         gbc.gridy = 1;
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(new JLabel("Nickname:"), gbc);
 
         usernameField = new JTextField();
