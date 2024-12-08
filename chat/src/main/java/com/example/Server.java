@@ -14,7 +14,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -40,6 +42,11 @@ public class Server implements Runnable {
     private volatile boolean done; // Indica lo stato del server
     private final ExecutorService executor; // Pool di thread per gestire le connessioni
     private final ConcurrentHashMap<String, Integer> ipConnections = new ConcurrentHashMap<>();
+    private static final int MAX_ATTEMPTS = 10;
+    private static final long BLOCK_TIME = 15000;
+    private Map<String, Integer> loginAttempts = new HashMap<>();
+    private Map<String, Long> blockTime = new HashMap<>();
+
 
     public Server() {
         connections = new CopyOnWriteArrayList<>();
@@ -207,6 +214,8 @@ public class Server implements Runnable {
             }
         }
 
+       
+        
         private synchronized void handleLogin(String message) {
             String[] parts = message.split("\\s+", 3);
             if (parts.length != 3) {
@@ -215,16 +224,37 @@ public class Server implements Runnable {
             }
             String nickname = parts[1];
             String password = parts[2];
-
+        
+            // Verifica se l'utente è bloccato
+            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) < BLOCK_TIME) {
+                out.println("/error Account bloccato per tentativi falliti. Riprova dopo 15 secondi.");
+                return;
+            }
+        
+            // Resetta il contatore se è passato il tempo di blocco
+            if (blockTime.containsKey(nickname) && (System.currentTimeMillis() - blockTime.get(nickname)) >= BLOCK_TIME) {
+                loginAttempts.remove(nickname);
+                blockTime.remove(nickname);
+            }
+        
             if (validateLogin(nickname, password)) {
                 clientInfo.setAuthenticated(true);
                 clientInfo.setNickname(nickname);
                 out.println("/login_success");
                 updateUsersList();
+                loginAttempts.remove(nickname); // Rimuove il contatore dei tentativi falliti
+                blockTime.remove(nickname); // Rimuove il tempo di blocco
             } else {
+                loginAttempts.put(nickname, loginAttempts.getOrDefault(nickname, 0) + 1);
                 out.println("/error Nome utente o password errati.");
+        
+                if (loginAttempts.get(nickname) >= MAX_ATTEMPTS) {
+                    blockTime.put(nickname, System.currentTimeMillis());
+                    out.println("/error Account bloccato per troppi tentativi falliti. Riprova dopo 15 secondi.");
+                }
             }
         }
+        
 
         private synchronized void handleRegister(String message) {
             String[] parts = message.split("\\s+", 3);
